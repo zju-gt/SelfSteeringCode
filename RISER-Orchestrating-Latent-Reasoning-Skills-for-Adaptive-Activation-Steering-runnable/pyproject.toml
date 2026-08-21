@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "riser-runnable"
+version = "0.1.0"
+description = "Runnable foundation for RISER activation steering"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.17,<2.0",
+    "torch>=2.0",
+    "transformers>=4.35",
+    "scikit-learn>=1.2",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+judge = ["anthropic>=0.30"]
+dev = ["pytest>=7.4"]
+
+[tool.setuptools.packages.find]
+include = ["riser*"]

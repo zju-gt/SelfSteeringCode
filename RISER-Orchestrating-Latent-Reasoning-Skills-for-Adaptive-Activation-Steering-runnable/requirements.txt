@@ -1,0 +1,8 @@
+numpy>=1.17,<2.0
+torch>=2.0
+transformers>=4.35
+scikit-learn>=1.2
+matplotlib>=3.7
+
+# Optional LLM-Judge support:
+# anthropic>=0.30
