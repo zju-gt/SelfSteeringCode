@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 judge = ["anthropic>=0.30"]
 dev = ["pytest>=7.4"]
+data = ["datasets>=2.14"]
 
 [tool.setuptools.packages.find]
 include = ["riser*"]

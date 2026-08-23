@@ -7,16 +7,17 @@ evaluation runner.
 
 ## Scope
 
-The foundation intentionally does not download datasets, call the LLM-Judge,
-or train the Router. Those components can be added later using the stable APIs
-implemented here. The optional Judge dependency is loaded only when
-`LLMJudgeFilter` is instantiated.
+The main steering/evaluation path does not download datasets, call the
+LLM-Judge, or train the Router. The opt-in MMLU collection example downloads
+the selected mathematics subjects and builds prompt pairs and vectors. The
+optional Judge dependency is loaded only when `LLMJudgeFilter` is instantiated.
 
 ## Installation
 
 ```text
 python -m pip install -e .
 python -m pip install -e ".[dev]"
+python -m pip install -e ".[data]"
 ```
 
 For Judge support:
@@ -87,6 +88,22 @@ python examples/build_primitives.py \
   --output primitives.pt
 ```
 
+Collect 500 contrastive activation vectors from MMLU mathematics subjects
+and build a primitive library in one step.  This requires the `data` extra:
+
+```text
+python examples/collect_mmlu_math_vectors.py \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --layers 20 \
+  --device cuda \
+  --prompt-pairs-output artifacts/mmlu_math_500_prompt_pairs.jsonl \
+  --vectors-output artifacts/mmlu_math_500_vectors.pt \
+  --library-output artifacts/mmlu_math_500_primitives.pt
+```
+
+The positive prompts request careful reasoning and the negative prompts ask
+for only the answer letter.  The script does not use the optional LLM Judge.
+
 Generate one steered answer using an existing Router checkpoint:
 
 ```text
@@ -97,6 +114,25 @@ python examples/run_steering.py \
   --layer 20 \
   --prompt "Solve this problem carefully: ..."
 ```
+
+For a preliminary experiment, a Router checkpoint is optional.  Omit
+`--router` and set primitive IDs and strengths manually:
+
+```text
+python examples/run_steering.py \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --library primitives.pt \
+  --layer 20 \
+  --fixed-primitives 0 2 \
+  --fixed-strengths 1.0 0.5 \
+  --prompt "Solve this problem carefully: ..."
+```
+
+When `--router` is omitted, the route is deterministic and independent of
+the hidden state.  If no fixed primitives are supplied, the model runs with
+an empty route, which is useful as a no-injection control.  Fixed primitive
+IDs refer to the row positions in the saved library and fixed strengths are
+bounded by `--fixed-max-strength` (default `2.0`).
 
 Run the initial baseline-versus-steered evaluator:
 
@@ -110,7 +146,23 @@ python -m riser.evaluation.cli \
   --output results.jsonl
 ```
 
+The evaluator accepts the same fixed-route options and can therefore run
+without `--router`:
+
+```text
+python -m riser.evaluation.cli \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --library primitives.pt \
+  --layer 20 \
+  --fixed-primitives 0 \
+  --fixed-strengths 1.0 \
+  --input evaluation.jsonl \
+  --output results.jsonl
+```
+
 The evaluator records both generations, input/output/total token counts,
 latency, exact/substring reference metrics, and the Router's selected
 primitive IDs and strengths. It does not train a Router or call an external
-LLM-Judge; a Router checkpoint must therefore be supplied by the caller.
+LLM-Judge. The current runnable foundation intentionally uses an external
+MLP Router when a checkpoint is supplied; self-generated steering
+configurations are reserved for a later experiment.

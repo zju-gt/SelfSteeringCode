@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from riser.router import Router, RouterConfig
+from riser.router import Router, RouterConfig, RouterInference
 
 
 class RouterTests(unittest.TestCase):
@@ -83,6 +83,42 @@ class RouterTests(unittest.TestCase):
         )
         restored = RouterConfig.from_dict(config.to_dict())
         self.assertEqual(restored, config)
+
+    def test_fixed_router_composes_manual_strengths_without_checkpoint(self):
+        routing = RouterInference.from_fixed_library(
+            primitive_library=torch.tensor(
+                [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
+            ),
+            target_layer=0,
+            device="cpu",
+            fixed_primitives=[0, 2],
+            fixed_strengths=[0.5, 1.5],
+        )
+
+        injected, info = routing.inject_activation(torch.zeros(2, 3))
+
+        torch.testing.assert_close(
+            injected,
+            torch.tensor([[0.5, 0.0, 1.5], [0.5, 0.0, 1.5]]),
+        )
+        self.assertEqual(info["selected_primitives"], [[0, 2], [0, 2]])
+        self.assertEqual(info["selected_strengths"], [[0.5, 1.5], [0.5, 1.5]])
+
+    def test_fixed_router_allows_empty_route(self):
+        routing = RouterInference.from_fixed_library(
+            primitive_library=torch.eye(2),
+            target_layer=0,
+            device="cpu",
+        )
+
+        injected, info = routing.inject_activation(torch.ones(1, 2))
+
+        torch.testing.assert_close(injected, torch.ones(1, 2))
+        self.assertEqual(info["selected_primitives"], [[]])
 
 
 if __name__ == "__main__":

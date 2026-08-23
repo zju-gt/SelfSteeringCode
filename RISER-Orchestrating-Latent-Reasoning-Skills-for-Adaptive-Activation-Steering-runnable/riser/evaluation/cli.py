@@ -17,7 +17,10 @@ def build_parser() -> argparse.ArgumentParser:
         description="Compare a baseline Hugging Face model with RISER steering."
     )
     parser.add_argument("--model", required=True, help="Hugging Face model name or path")
-    parser.add_argument("--router", required=True, help="Router checkpoint path")
+    parser.add_argument(
+        "--router",
+        help="Router checkpoint path; omit it to use deterministic fixed routing",
+    )
     parser.add_argument("--library", required=True, help="Primitive library .pt path")
     parser.add_argument("--layer", required=True, type=int, help="Target transformer layer")
     parser.add_argument("--input", required=True, help="Input JSONL examples")
@@ -25,6 +28,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dtype", default="float32", choices=["float32", "float16", "bfloat16"])
+    parser.add_argument(
+        "--fixed-primitives",
+        type=int,
+        nargs="+",
+        help="Primitive IDs for no-checkpoint mode, e.g. --fixed-primitives 0 2",
+    )
+    parser.add_argument(
+        "--fixed-strengths",
+        type=float,
+        nargs="+",
+        help="Strength for each fixed primitive; defaults to 1.0",
+    )
+    parser.add_argument("--fixed-max-strength", type=float, default=2.0)
     parser.add_argument(
         "--no-cache-routing",
         action="store_true",
@@ -57,6 +73,8 @@ def main(argv=None) -> int:
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
+    if args.router is None and args.fixed_strengths is not None and args.fixed_primitives is None:
+        raise ValueError("--fixed-strengths requires --fixed-primitives")
     dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
@@ -75,6 +93,9 @@ def main(argv=None) -> int:
         primitive_library_path=args.library,
         target_layer=args.layer,
         device=args.device,
+        fixed_primitives=args.fixed_primitives,
+        fixed_strengths=args.fixed_strengths,
+        fixed_max_strength=args.fixed_max_strength,
     )
     steered_model = SteeredModel(
         base_model,

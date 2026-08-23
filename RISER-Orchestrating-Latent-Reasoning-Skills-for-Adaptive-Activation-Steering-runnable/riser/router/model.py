@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Mapping, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -169,4 +169,80 @@ class Router(nn.Module):
         return injection, info
 
 
-__all__ = ["Router", "RouterConfig"]
+class FixedRouter(Router):
+    """A deterministic Router for experiments without a Router checkpoint.
+
+    The fixed route is independent of the hidden state.  It keeps the same
+    ``forward`` and ``route`` contract as :class:`Router`, so it can be used
+    by the existing inference and generation wrappers.
+    """
+
+    def __init__(
+        self,
+        config: Union[RouterConfig, Mapping[str, Any]],
+        primitive_ids: Sequence[int] = (),
+        strengths: Sequence[float] = (),
+    ) -> None:
+        nn.Module.__init__(self)
+        if isinstance(config, Mapping):
+            config = RouterConfig.from_dict(config)
+        if not isinstance(config, RouterConfig):
+            raise TypeError("config must be a RouterConfig or mapping")
+        if len(primitive_ids) != len(strengths):
+            raise ValueError("primitive_ids and strengths must have the same length")
+
+        selection = torch.zeros(config.num_primitives, dtype=torch.float32)
+        fixed_strengths = torch.zeros(config.num_primitives, dtype=torch.float32)
+        for primitive_id, strength in zip(primitive_ids, strengths):
+            if not isinstance(primitive_id, int) or isinstance(primitive_id, bool):
+                raise TypeError("primitive_ids must contain integers")
+            if not 0 <= primitive_id < config.num_primitives:
+                raise ValueError(
+                    f"primitive id {primitive_id} is outside [0, {config.num_primitives})"
+                )
+            if not 0.0 <= float(strength) <= config.max_strength:
+                raise ValueError(
+                    f"fixed strengths must be between 0 and {config.max_strength}"
+                )
+            if selection[primitive_id] > 0:
+                raise ValueError(f"primitive id {primitive_id} was specified twice")
+            selection[primitive_id] = 1.0
+            fixed_strengths[primitive_id] = float(strength)
+
+        self.config = config
+        self.register_buffer("fixed_selection", selection)
+        self.register_buffer("fixed_strengths", fixed_strengths)
+
+    def forward(self, hidden_state: torch.Tensor, hard: bool = False):
+        hidden_state = self._prepare_hidden_state(hidden_state)
+        batch_size = hidden_state.shape[0]
+        selection_mask = self.fixed_selection.to(
+            device=hidden_state.device,
+            dtype=hidden_state.dtype,
+        ).expand(batch_size, -1)
+        strength = self.fixed_strengths.to(
+            device=hidden_state.device,
+            dtype=hidden_state.dtype,
+        ).expand(batch_size, -1)
+        selection_probs = selection_mask
+        selection_logits = torch.where(
+            selection_mask > 0.5,
+            torch.full_like(selection_mask, 20.0),
+            torch.full_like(selection_mask, -20.0),
+        )
+        features = torch.zeros(
+            batch_size,
+            self.config.bottleneck_dim,
+            device=hidden_state.device,
+            dtype=hidden_state.dtype,
+        )
+        return (
+            selection_mask,
+            strength,
+            selection_probs,
+            selection_logits,
+            features,
+        )
+
+
+__all__ = ["Router", "FixedRouter", "RouterConfig"]

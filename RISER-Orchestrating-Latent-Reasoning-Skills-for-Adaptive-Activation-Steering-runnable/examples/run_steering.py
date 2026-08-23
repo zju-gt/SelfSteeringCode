@@ -1,4 +1,4 @@
-"""Generate one answer with a saved Router and primitive library."""
+"""Generate one answer with a trained or fixed Router and primitive library."""
 
 from __future__ import annotations
 
@@ -14,12 +14,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--router", required=True)
+    parser.add_argument(
+        "--router",
+        help="Router checkpoint path; omit it to use deterministic fixed routing",
+    )
     parser.add_argument("--library", required=True)
     parser.add_argument("--layer", required=True, type=int)
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--fixed-primitives",
+        type=int,
+        nargs="+",
+        help="Primitive IDs for no-checkpoint mode, e.g. --fixed-primitives 0 2",
+    )
+    parser.add_argument(
+        "--fixed-strengths",
+        type=float,
+        nargs="+",
+        help="Strength for each fixed primitive; defaults to 1.0",
+    )
+    parser.add_argument("--fixed-max-strength", type=float, default=2.0)
     parser.add_argument("--no-cache-routing", action="store_true")
     return parser
 
@@ -33,6 +49,8 @@ def main(argv=None):
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
+    if args.router is None and args.fixed_strengths is not None and args.fixed_primitives is None:
+        raise ValueError("--fixed-strengths requires --fixed-primitives")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -43,6 +61,9 @@ def main(argv=None):
         args.library,
         target_layer=args.layer,
         device=args.device,
+        fixed_primitives=args.fixed_primitives,
+        fixed_strengths=args.fixed_strengths,
+        fixed_max_strength=args.fixed_max_strength,
     )
     steered = SteeredModel(
         model,
