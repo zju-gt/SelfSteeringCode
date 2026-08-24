@@ -69,6 +69,24 @@ class MMLUPreparationTests(unittest.TestCase):
 
 
 class MMLUEvaluatorTests(unittest.TestCase):
+    def test_parser_defaults_to_2048_new_tokens(self):
+        args = build_evaluator_parser().parse_args(
+            [
+                "--model",
+                "Qwen/model",
+                "--library",
+                "primitives.pt",
+                "--layer",
+                "20",
+                "--input",
+                "evaluation.jsonl",
+                "--output",
+                "results.jsonl",
+            ]
+        )
+
+        self.assertEqual(args.max_new_tokens, 2048)
+
     def test_parser_accepts_fixed_route_arguments(self):
         args = build_evaluator_parser().parse_args(
             [
