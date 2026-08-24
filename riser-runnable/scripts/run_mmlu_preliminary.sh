@@ -66,29 +66,29 @@ METADATA_OUTPUT="${OUTPUT_DIR}/primitives.json"
 EVALUATION_INPUT="${OUTPUT_DIR}/evaluation.jsonl"
 RESULTS_OUTPUT="${OUTPUT_DIR}/results.jsonl"
 
-echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
-"${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \
-    --model "${MODEL_PATH}" \
-    --dataset-name "${DATASET_NAME}" \
-    --subjects "${SUBJECTS[@]}" \
-    --split "${SPLIT}" \
-    --num-samples "${NUM_SAMPLES}" \
-    --seed "${SEED}" \
-    --layers "${LAYERS[@]}" \
-    --device "${DEVICE}" \
-    --dtype "${DTYPE}" \
-    --max-length "${MAX_LENGTH}" \
-    --aggregation "${AGGREGATION}" \
-    --clusters "${CLUSTERS}" \
-    --prompt-pairs-output "${PROMPT_PAIRS_OUTPUT}" \
-    --vectors-output "${VECTORS_OUTPUT}" \
-    --library-output "${LIBRARY_OUTPUT}" \
-    --metadata-output "${METADATA_OUTPUT}"
+# echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
+# "${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \
+#     --model "${MODEL_PATH}" \
+#     --dataset-name "${DATASET_NAME}" \
+#     --subjects "${SUBJECTS[@]}" \
+#     --split "${SPLIT}" \
+#     --num-samples "${NUM_SAMPLES}" \
+#     --seed "${SEED}" \
+#     --layers "${LAYERS[@]}" \
+#     --device "${DEVICE}" \
+#     --dtype "${DTYPE}" \
+#     --max-length "${MAX_LENGTH}" \
+#     --aggregation "${AGGREGATION}" \
+#     --clusters "${CLUSTERS}" \
+#     --prompt-pairs-output "${PROMPT_PAIRS_OUTPUT}" \
+#     --vectors-output "${VECTORS_OUTPUT}" \
+#     --library-output "${LIBRARY_OUTPUT}" \
+#     --metadata-output "${METADATA_OUTPUT}"
 
-echo "[2/3] Preparing MMLU evaluation inputs..."
-"${PYTHON_BIN}" scripts/prepare_mmlu_eval.py \
-    --input "${PROMPT_PAIRS_OUTPUT}" \
-    --output "${EVALUATION_INPUT}"
+# echo "[2/3] Preparing MMLU evaluation inputs..."
+# "${PYTHON_BIN}" scripts/prepare_mmlu_eval.py \
+#     --input "${PROMPT_PAIRS_OUTPUT}" \
+#     --output "${EVALUATION_INPUT}"
 
 echo "[3/3] Running baseline versus fixed-vector steering evaluation..."
 "${PYTHON_BIN}" scripts/evaluate_mmlu.py \
