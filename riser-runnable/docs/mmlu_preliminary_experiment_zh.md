@@ -50,6 +50,7 @@ LAYERS_RAW="20"
 INJECT_LAYER="20"
 NUM_SAMPLES="500"
 CLUSTERS="6"
+MAX_NEW_TOKENS="2048"
 FIXED_PRIMITIVES_RAW="0"
 FIXED_STRENGTHS_RAW="1.0"
 ```
@@ -63,6 +64,7 @@ FIXED_STRENGTHS_RAW="1.0"
 - `INJECT_LAYER`：实际注入层。当前预实验建议只使用一个层，并与 `LAYERS_RAW` 中的层一致。
 - `NUM_SAMPLES`：用于提取 vector 的 MMLU 样本数。第一次建议使用 `50` 或 `100` 做 smoke test，确认无误后再改成 `500`。
 - `CLUSTERS`：primitive 数量，默认 `6`。
+- `MAX_NEW_TOKENS`：每次生成允许的最大新 token 数，默认 `2048`。数学题需要先进行 reasoning 再输出选项，设置过小可能在最终答案前截断。仍可通过环境变量临时覆盖，例如 `MAX_NEW_TOKENS=512 bash scripts/run_mmlu_preliminary.sh`。
 - `FIXED_PRIMITIVES_RAW`：要注入的 primitive 行号，例如 `0 2`。
 - `FIXED_STRENGTHS_RAW`：对应的 strength，例如 `0.5 1.0`。两个列表长度必须相同，最大 strength 默认不超过 `2.0`。
 
@@ -94,6 +96,8 @@ NUM_SAMPLES="20"
 ```bash
 bash scripts/run_mmlu_preliminary.sh
 ```
+
+修改 `MAX_NEW_TOKENS` 只会影响后续运行；不会自动重新生成或覆盖已有的 `artifacts/mmlu_preliminary/` 结果文件。
 
 也可以不修改脚本，临时覆盖配置：
 

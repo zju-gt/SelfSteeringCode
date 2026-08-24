@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--layer", required=True, type=int, help="Injection layer")
     parser.add_argument("--input", required=True, help="MMLU evaluation JSONL")
     parser.add_argument("--output", required=True, help="Results JSONL")
-    parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--device", default="cpu")
     parser.add_argument(
         "--dtype",
