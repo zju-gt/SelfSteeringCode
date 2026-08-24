@@ -105,8 +105,9 @@ def main(argv=None) -> int:
         tokenizer=tokenizer,
         device=args.device,
     )
-    results = runner.run(
+    result_count = runner.run_to_jsonl(
         load_examples(args.input),
+        args.output,
         generation_kwargs={
             "max_new_tokens": args.max_new_tokens,
             "do_sample": False,
@@ -118,8 +119,7 @@ def main(argv=None) -> int:
             "substring_match": substring_match,
         },
     )
-    runner.write_jsonl(results, args.output)
-    print(f"Wrote {len(results)} MMLU evaluation results to {args.output}")
+    print(f"Wrote {result_count} MMLU evaluation results to {args.output}")
     return 0
 
 

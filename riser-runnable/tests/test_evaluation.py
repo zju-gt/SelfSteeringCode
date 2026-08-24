@@ -37,6 +37,18 @@ class TinySteeredModel(TinyModel):
         return {"selected_primitives": [[1]], "strengths": [[0.8]]}
 
 
+class FailingAfterFirstModel(TinyModel):
+    def __init__(self, generated_ids):
+        super().__init__(generated_ids)
+        self.calls = 0
+
+    def generate(self, input_ids, **kwargs):
+        self.calls += 1
+        if self.calls == 2:
+            raise RuntimeError("generation failed on second example")
+        return super().generate(input_ids, **kwargs)
+
+
 class EvaluationTests(unittest.TestCase):
     def test_reference_metrics_normalize_text(self):
         self.assertEqual(exact_match("  The Answer ", "the answer"), 1.0)
@@ -75,6 +87,26 @@ class EvaluationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "results.jsonl"
             runner.write_jsonl(results, output_path)
+            lines = output_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(json.loads(lines[0])["example_id"], "q1")
+
+    def test_streaming_runner_flushes_completed_pairs_before_later_failure(self):
+        runner = EvaluationRunner(
+            baseline_model=FailingAfterFirstModel([9, 10]),
+            steered_model=TinySteeredModel([9, 11]),
+            tokenizer=TinyTokenizer(),
+        )
+        examples = [
+            EvaluationExample("q1", "Question 1"),
+            EvaluationExample("q2", "Question 2"),
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "streamed.jsonl"
+            with self.assertRaisesRegex(RuntimeError, "second example"):
+                runner.run_to_jsonl(examples, output_path)
             lines = output_path.read_text(encoding="utf-8").splitlines()
 
         self.assertEqual(len(lines), 1)

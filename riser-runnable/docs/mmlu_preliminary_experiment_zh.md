@@ -143,6 +143,8 @@ results.jsonl       # 两种生成结果、MMLU accuracy、token 数、latency�
 
 MMLU accuracy 使用生成文本中最后一个独立的 `A/B/C/D` 选项作为模型答案，而不是对单字母做 substring match。
 
+评测现在采用即时写入：每完成一个样本的 baseline 和 steered 两次生成，就立即追加一行并 flush 到 `results.jsonl`。如果进程中途被终止，已经完成的样本仍会保留；重新运行同一命令时，结果文件会从头覆盖，不会自动续跑。
+
 ## 5. strength 和 primitive 对比
 
 固定 vector 模式下，可以重复运行不同配置：

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Mapping, Optional
+from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional
 
 import torch
 
@@ -75,16 +75,12 @@ class EvaluationRunner:
             "latency_seconds": elapsed,
         }
 
-    def run(
+    def _iter_results(
         self,
         examples: Iterable[EvaluationExample],
-        generation_kwargs: Optional[Dict] = None,
-        metrics: Optional[Mapping[str, Metric]] = None,
-    ) -> List[EvaluationResult]:
-        generation_kwargs = dict(generation_kwargs or {})
-        metrics = dict(metrics or {})
-        results = []
-
+        generation_kwargs: Dict,
+        metrics: Mapping[str, Metric],
+    ) -> Iterator[EvaluationResult]:
         for example in examples:
             baseline = self._generate(
                 self.baseline_model,
@@ -108,27 +104,61 @@ class EvaluationRunner:
                 None,
             )
             routing = get_routing_info() if get_routing_info else None
-            results.append(
-                EvaluationResult(
-                    example_id=example.example_id,
-                    prompt=example.prompt,
-                    reference=example.reference,
-                    baseline_output=baseline["text"],
-                    steered_output=steered["text"],
-                    baseline_input_tokens=baseline["input_tokens"],
-                    baseline_output_tokens=baseline["output_tokens"],
-                    baseline_total_tokens=baseline["total_tokens"],
-                    steered_input_tokens=steered["input_tokens"],
-                    steered_output_tokens=steered["output_tokens"],
-                    steered_total_tokens=steered["total_tokens"],
-                    baseline_latency_seconds=baseline["latency_seconds"],
-                    steered_latency_seconds=steered["latency_seconds"],
-                    metrics=metric_values,
-                    routing=routing,
-                    metadata=example.metadata,
-                )
+            yield EvaluationResult(
+                example_id=example.example_id,
+                prompt=example.prompt,
+                reference=example.reference,
+                baseline_output=baseline["text"],
+                steered_output=steered["text"],
+                baseline_input_tokens=baseline["input_tokens"],
+                baseline_output_tokens=baseline["output_tokens"],
+                baseline_total_tokens=baseline["total_tokens"],
+                steered_input_tokens=steered["input_tokens"],
+                steered_output_tokens=steered["output_tokens"],
+                steered_total_tokens=steered["total_tokens"],
+                baseline_latency_seconds=baseline["latency_seconds"],
+                steered_latency_seconds=steered["latency_seconds"],
+                metrics=metric_values,
+                routing=routing,
+                metadata=example.metadata,
             )
-        return results
+
+    def run(
+        self,
+        examples: Iterable[EvaluationExample],
+        generation_kwargs: Optional[Dict] = None,
+        metrics: Optional[Mapping[str, Metric]] = None,
+    ) -> List[EvaluationResult]:
+        return list(
+            self._iter_results(
+                examples,
+                generation_kwargs=dict(generation_kwargs or {}),
+                metrics=dict(metrics or {}),
+            )
+        )
+
+    def run_to_jsonl(
+        self,
+        examples: Iterable[EvaluationExample],
+        path,
+        generation_kwargs: Optional[Dict] = None,
+        metrics: Optional[Mapping[str, Metric]] = None,
+    ) -> int:
+        """Evaluate and flush each completed baseline/steered pair to JSONL."""
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        count = 0
+        with path.open("w", encoding="utf-8") as handle:
+            for result in self._iter_results(
+                examples,
+                generation_kwargs=dict(generation_kwargs or {}),
+                metrics=dict(metrics or {}),
+            ):
+                handle.write(json.dumps(result.to_dict(), ensure_ascii=False) + "\n")
+                handle.flush()
+                count += 1
+        return count
 
     @staticmethod
     def write_jsonl(results: Iterable[EvaluationResult], path) -> None:
