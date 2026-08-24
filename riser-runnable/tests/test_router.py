@@ -120,6 +120,20 @@ class RouterTests(unittest.TestCase):
         torch.testing.assert_close(injected, torch.ones(1, 2))
         self.assertEqual(info["selected_primitives"], [[]])
 
+    def test_inference_preserves_hidden_dtype(self):
+        routing = RouterInference(
+            router=self.make_router(),
+            primitive_library=torch.zeros(3, 4),
+            target_layer=0,
+            device="cpu",
+        )
+
+        hidden = torch.zeros(2, 4, dtype=torch.float16)
+        injected, _ = routing.inject_activation(hidden)
+
+        self.assertEqual(injected.dtype, hidden.dtype)
+        self.assertEqual(injected.shape, hidden.shape)
+
 
 if __name__ == "__main__":
     unittest.main()

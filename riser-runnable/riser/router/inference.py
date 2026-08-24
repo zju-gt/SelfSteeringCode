@@ -31,29 +31,47 @@ class RouterInference:
         
         logger.info(f"RouterInference initialized: target_layer={target_layer}, "
                    f"num_primitives={primitive_library.shape[0]}")
+
+    def _router_dtype(self, fallback: torch.dtype) -> torch.dtype:
+        """Return the dtype used by Router parameters or fixed buffers."""
+
+        parameters = iter(self.router.parameters())
+        parameter = next(parameters, None)
+        if parameter is not None:
+            return parameter.dtype
+
+        buffers = iter(self.router.buffers())
+        buffer = next(buffers, None)
+        return buffer.dtype if buffer is not None else fallback
     
     @torch.no_grad()
     def inject_activation(
         self,
         hidden_state: torch.Tensor,
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        original_device = hidden_state.device
+        original_dtype = hidden_state.dtype
         hidden_state = hidden_state.to(self.device)
+        routing_hidden = hidden_state.to(
+            dtype=self._router_dtype(hidden_state.dtype)
+        )
         
         v_inject, info = self.router.route(
-            hidden_state,
+            routing_hidden,
             self.primitive_library,
             hard=True,
         )
         
-        injected_state = hidden_state + v_inject
-        
-        return injected_state, info
+        injected_state = routing_hidden + v_inject
+
+        return injected_state.to(device=original_device, dtype=original_dtype), info
     
     def get_routing_info(
         self,
         hidden_state: torch.Tensor,
     ) -> Dict[str, Any]:
         hidden_state = hidden_state.to(self.device)
+        hidden_state = hidden_state.to(dtype=self._router_dtype(hidden_state.dtype))
         
         with torch.no_grad():
             selection_mask, strength, selection_probs, _, _ = self.router.forward(
