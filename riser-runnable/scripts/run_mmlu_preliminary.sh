@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+export CUDA_VISIBLE_DEVICES=2
 
 # Edit these values for the server, or override them as environment variables.
 PYTHON_BIN="${PYTHON_BIN:-python}"
-MODEL_PATH="${MODEL_PATH:-/path/to/Qwen/Qwen2.5-7B-Instruct}"
+MODEL_PATH="${MODEL_PATH:-/sda/llm_weights/Qwen2.5-7B-Instruct}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"
 LAYERS_RAW="${LAYERS_RAW:-20}"
