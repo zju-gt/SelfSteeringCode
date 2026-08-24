@@ -10,6 +10,7 @@ from scripts.prepare_mmlu_eval import (
     extract_last_choice,
     mmlu_choice_match,
 )
+from scripts.evaluate_mmlu import build_parser as build_evaluator_parser
 
 
 class MMLUPreparationTests(unittest.TestCase):
@@ -65,6 +66,41 @@ class MMLUPreparationTests(unittest.TestCase):
         self.assertEqual(converted["reference"], "B")
         self.assertEqual(converted["metadata"]["subject"], "abstract_algebra")
         self.assertEqual(converted["metadata"]["choices"][1], "two")
+
+
+class MMLUEvaluatorTests(unittest.TestCase):
+    def test_parser_accepts_fixed_route_arguments(self):
+        args = build_evaluator_parser().parse_args(
+            [
+                "--model",
+                "Qwen/model",
+                "--library",
+                "primitives.pt",
+                "--layer",
+                "20",
+                "--input",
+                "evaluation.jsonl",
+                "--output",
+                "results.jsonl",
+                "--fixed-primitives",
+                "0",
+                "2",
+                "--fixed-strengths",
+                "0.5",
+                "1.0",
+                "--device",
+                "cpu",
+                "--dtype",
+                "float32",
+                "--max-new-tokens",
+                "32",
+            ]
+        )
+
+        self.assertEqual(args.layer, 20)
+        self.assertEqual(args.fixed_primitives, [0, 2])
+        self.assertEqual(args.fixed_strengths, [0.5, 1.0])
+        self.assertEqual(args.max_new_tokens, 32)
 
 
 if __name__ == "__main__":
