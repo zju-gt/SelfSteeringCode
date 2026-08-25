@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from itertools import islice
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional
 
@@ -75,65 +76,195 @@ class EvaluationRunner:
             "latency_seconds": elapsed,
         }
 
+    def _generate_batch(self, model, prompts, generation_kwargs):
+        """Generate a padded batch and return one accounting record per prompt."""
+
+        prompts = list(prompts)
+        if not prompts:
+            return []
+        if hasattr(self.tokenizer, "padding_side"):
+            # Decoder-only generation must use left padding so the final input
+            # position is the last real prompt token for every example.
+            self.tokenizer.padding_side = "left"
+        encoded = self.tokenizer(prompts, return_tensors="pt", padding=True)
+        if isinstance(encoded, Mapping):
+            input_ids = encoded["input_ids"]
+            attention_mask = encoded.get("attention_mask")
+        else:
+            input_ids = encoded.input_ids
+            attention_mask = getattr(encoded, "attention_mask", None)
+        if not isinstance(input_ids, torch.Tensor) or input_ids.ndim != 2:
+            raise TypeError("tokenizer must return a [batch, sequence] input_ids tensor")
+
+        if isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2:
+            input_lengths = attention_mask.to(dtype=torch.long).sum(dim=-1).tolist()
+        else:
+            input_lengths = [int(input_ids.shape[-1])] * len(prompts)
+
+        device = self._model_device(model)
+        encoded = self._move_inputs(encoded, device)
+        start = time.perf_counter()
+        output = model.generate(**encoded, **generation_kwargs)
+        elapsed = time.perf_counter() - start
+        sequences = self._sequences(output)
+        if sequences.shape[0] != len(prompts):
+            raise ValueError(
+                "model.generate returned a different batch size: "
+                f"expected {len(prompts)}, got {sequences.shape[0]}"
+            )
+        padded_length = int(input_ids.shape[-1])
+        if sequences.shape[-1] < padded_length:
+            raise ValueError("model.generate returned sequences shorter than the input batch")
+
+        generated_ids = sequences[:, padded_length:]
+        records = []
+        for index, input_length in enumerate(input_lengths):
+            generated = generated_ids[index]
+            records.append(
+                {
+                    "text": self.tokenizer.decode(
+                        generated,
+                        skip_special_tokens=True,
+                    ),
+                    "input_tokens": int(input_length),
+                    "output_tokens": int(generated.shape[-1]),
+                    "total_tokens": int(input_length + generated.shape[-1]),
+                    # This is the elapsed time for the batch that produced
+                    # this example; per-example GPU timing needs synchronization.
+                    "latency_seconds": elapsed,
+                }
+            )
+        return records
+
+    @staticmethod
+    def _routing_for_example(routing, index: int, batch_size: int):
+        if not isinstance(routing, Mapping):
+            return routing
+        selected = {}
+        for key, value in routing.items():
+            if isinstance(value, list) and len(value) == batch_size:
+                selected[key] = value[index]
+            else:
+                selected[key] = value
+        return selected
+
+    @staticmethod
+    def _validate_batch_size(batch_size: int) -> None:
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+            raise TypeError("batch_size must be a positive integer")
+        if batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+
+    @staticmethod
+    def _result_from_parts(
+        example: EvaluationExample,
+        baseline,
+        steered,
+        metrics: Mapping[str, Metric],
+        routing,
+    ) -> EvaluationResult:
+        metric_values = {}
+        for name, metric in metrics.items():
+            metric_values[name] = {
+                "baseline": metric(baseline["text"], example.reference),
+                "steered": metric(steered["text"], example.reference),
+            }
+        return EvaluationResult(
+            example_id=example.example_id,
+            prompt=example.prompt,
+            reference=example.reference,
+            baseline_output=baseline["text"],
+            steered_output=steered["text"],
+            baseline_input_tokens=baseline["input_tokens"],
+            baseline_output_tokens=baseline["output_tokens"],
+            baseline_total_tokens=baseline["total_tokens"],
+            steered_input_tokens=steered["input_tokens"],
+            steered_output_tokens=steered["output_tokens"],
+            steered_total_tokens=steered["total_tokens"],
+            baseline_latency_seconds=baseline["latency_seconds"],
+            steered_latency_seconds=steered["latency_seconds"],
+            metrics=metric_values,
+            routing=routing,
+            metadata=example.metadata,
+        )
+
     def _iter_results(
         self,
         examples: Iterable[EvaluationExample],
         generation_kwargs: Dict,
         metrics: Mapping[str, Metric],
+        batch_size: int = 1,
     ) -> Iterator[EvaluationResult]:
-        for example in examples:
-            baseline = self._generate(
+        self._validate_batch_size(batch_size)
+        get_routing_info = getattr(
+            self.steered_model,
+            "get_last_routing_info",
+            None,
+        )
+
+        if batch_size == 1:
+            for example in examples:
+                baseline = self._generate(
+                    self.baseline_model,
+                    example.prompt,
+                    generation_kwargs,
+                )
+                steered = self._generate(
+                    self.steered_model,
+                    example.prompt,
+                    generation_kwargs,
+                )
+                routing = get_routing_info() if get_routing_info else None
+                yield self._result_from_parts(
+                    example,
+                    baseline,
+                    steered,
+                    metrics,
+                    routing,
+                )
+            return
+
+        iterator = iter(examples)
+        while True:
+            batch = list(islice(iterator, batch_size))
+            if not batch:
+                return
+            prompts = [example.prompt for example in batch]
+            baselines = self._generate_batch(
                 self.baseline_model,
-                example.prompt,
+                prompts,
                 generation_kwargs,
             )
-            steered = self._generate(
+            steereds = self._generate_batch(
                 self.steered_model,
-                example.prompt,
+                prompts,
                 generation_kwargs,
-            )
-            metric_values = {}
-            for name, metric in metrics.items():
-                metric_values[name] = {
-                    "baseline": metric(baseline["text"], example.reference),
-                    "steered": metric(steered["text"], example.reference),
-                }
-            get_routing_info = getattr(
-                self.steered_model,
-                "get_last_routing_info",
-                None,
             )
             routing = get_routing_info() if get_routing_info else None
-            yield EvaluationResult(
-                example_id=example.example_id,
-                prompt=example.prompt,
-                reference=example.reference,
-                baseline_output=baseline["text"],
-                steered_output=steered["text"],
-                baseline_input_tokens=baseline["input_tokens"],
-                baseline_output_tokens=baseline["output_tokens"],
-                baseline_total_tokens=baseline["total_tokens"],
-                steered_input_tokens=steered["input_tokens"],
-                steered_output_tokens=steered["output_tokens"],
-                steered_total_tokens=steered["total_tokens"],
-                baseline_latency_seconds=baseline["latency_seconds"],
-                steered_latency_seconds=steered["latency_seconds"],
-                metrics=metric_values,
-                routing=routing,
-                metadata=example.metadata,
-            )
+            for index, (example, baseline, steered) in enumerate(
+                zip(batch, baselines, steereds)
+            ):
+                yield self._result_from_parts(
+                    example,
+                    baseline,
+                    steered,
+                    metrics,
+                    self._routing_for_example(routing, index, len(batch)),
+                )
 
     def run(
         self,
         examples: Iterable[EvaluationExample],
         generation_kwargs: Optional[Dict] = None,
         metrics: Optional[Mapping[str, Metric]] = None,
+        batch_size: int = 1,
     ) -> List[EvaluationResult]:
         return list(
             self._iter_results(
                 examples,
                 generation_kwargs=dict(generation_kwargs or {}),
                 metrics=dict(metrics or {}),
+                batch_size=batch_size,
             )
         )
 
@@ -143,6 +274,7 @@ class EvaluationRunner:
         path,
         generation_kwargs: Optional[Dict] = None,
         metrics: Optional[Mapping[str, Metric]] = None,
+        batch_size: int = 1,
     ) -> int:
         """Evaluate and flush each completed baseline/steered pair to JSONL."""
 
@@ -154,6 +286,7 @@ class EvaluationRunner:
                 examples,
                 generation_kwargs=dict(generation_kwargs or {}),
                 metrics=dict(metrics or {}),
+                batch_size=batch_size,
             ):
                 handle.write(json.dumps(result.to_dict(), ensure_ascii=False) + "\n")
                 handle.flush()

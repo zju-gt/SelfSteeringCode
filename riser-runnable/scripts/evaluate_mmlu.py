@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", required=True, help="MMLU evaluation JSONL")
     parser.add_argument("--output", required=True, help="Results JSONL")
     parser.add_argument("--max-new-tokens", type=int, default=2048)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Number of examples to generate in each Transformers batch",
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument(
         "--dtype",
@@ -59,6 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _validate_args(args: argparse.Namespace) -> None:
     if args.max_new_tokens <= 0:
         raise ValueError("--max-new-tokens must be positive")
+    if args.batch_size <= 0:
+        raise ValueError("--batch-size must be positive")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
     if args.router is None and args.fixed_strengths is not None and args.fixed_primitives is None:
@@ -118,6 +126,7 @@ def main(argv=None) -> int:
             "exact_match": exact_match,
             "substring_match": substring_match,
         },
+        batch_size=args.batch_size,
     )
     print(f"Wrote {result_count} MMLU evaluation results to {args.output}")
     return 0

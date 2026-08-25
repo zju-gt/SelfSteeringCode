@@ -26,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", required=True, help="Input JSONL examples")
     parser.add_argument("--output", required=True, help="Output JSONL results")
     parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Number of examples to generate in each Transformers batch",
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dtype", default="float32", choices=["float32", "float16", "bfloat16"])
     parser.add_argument(
@@ -75,6 +81,10 @@ def main(argv=None) -> int:
         raise RuntimeError("CUDA was requested but is not available")
     if args.router is None and args.fixed_strengths is not None and args.fixed_primitives is None:
         raise ValueError("--fixed-strengths requires --fixed-primitives")
+    if args.max_new_tokens <= 0:
+        raise ValueError("--max-new-tokens must be positive")
+    if args.batch_size <= 0:
+        raise ValueError("--batch-size must be positive")
     dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
@@ -116,6 +126,7 @@ def main(argv=None) -> int:
             "pad_token_id": tokenizer.pad_token_id,
         },
         metrics={"exact_match": exact_match, "substring_match": substring_match},
+        batch_size=args.batch_size,
     )
     runner.write_jsonl(results, args.output)
     print(f"Wrote {len(results)} evaluation results to {args.output}")

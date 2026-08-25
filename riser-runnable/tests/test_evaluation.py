@@ -24,6 +24,28 @@ class TinyTokenizer:
         return "Correct with extra explanation"
 
 
+class BatchTokenizer:
+    def __init__(self):
+        self.padding_side = "right"
+
+    def __call__(self, prompts, return_tensors=None, padding=False):
+        if not isinstance(prompts, list) or not padding:
+            raise AssertionError("batch tokenization must receive a padded list")
+        lengths = [2 if "short" in prompt else 3 for prompt in prompts]
+        max_length = max(lengths)
+        input_ids = torch.zeros(len(prompts), max_length, dtype=torch.long)
+        attention_mask = torch.zeros_like(input_ids)
+        for row, length in enumerate(lengths):
+            start = max_length - length
+            input_ids[row, start:] = torch.arange(1, length + 1)
+            attention_mask[row, start:] = 1
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
+
+    def decode(self, token_ids, skip_special_tokens=True):
+        values = token_ids.tolist()
+        return {9: "A", 10: "B", 19: "S", 20: "T"}.get(values[0], "unknown")
+
+
 class TinyModel:
     def __init__(self, generated_ids):
         self.generated_ids = torch.tensor([generated_ids])
@@ -47,6 +69,40 @@ class FailingAfterFirstModel(TinyModel):
         if self.calls == 2:
             raise RuntimeError("generation failed on second example")
         return super().generate(input_ids, **kwargs)
+
+
+class BatchModel:
+    def __init__(self, token_start):
+        self.token_start = token_start
+        self.calls = []
+
+    def generate(self, input_ids, **kwargs):
+        self.calls.append(tuple(input_ids.shape))
+        generated = torch.arange(
+            self.token_start,
+            self.token_start + input_ids.shape[0],
+            dtype=input_ids.dtype,
+        ).unsqueeze(1)
+        return torch.cat([input_ids, generated], dim=1)
+
+
+class BatchSteeredModel(BatchModel):
+    def __init__(self):
+        super().__init__(19)
+        self._routing = None
+
+    def generate(self, input_ids, **kwargs):
+        result = super().generate(input_ids, **kwargs)
+        self._routing = {
+            "selected_primitives": [
+                [index] for index in range(input_ids.shape[0])
+            ],
+            "strengths": [[0.5 + index] for index in range(input_ids.shape[0])],
+        }
+        return result
+
+    def get_last_routing_info(self):
+        return self._routing
 
 
 class EvaluationTests(unittest.TestCase):
@@ -111,6 +167,39 @@ class EvaluationTests(unittest.TestCase):
 
         self.assertEqual(len(lines), 1)
         self.assertEqual(json.loads(lines[0])["example_id"], "q1")
+
+    def test_runner_batches_generation_preserves_order_and_per_example_metadata(self):
+        tokenizer = BatchTokenizer()
+        baseline = BatchModel(9)
+        steered = BatchSteeredModel()
+        runner = EvaluationRunner(
+            baseline_model=baseline,
+            steered_model=steered,
+            tokenizer=tokenizer,
+        )
+        examples = [
+            EvaluationExample("q1", "short one", reference="A"),
+            EvaluationExample("q2", "long prompt", reference="B"),
+            EvaluationExample("q3", "short three", reference="A"),
+        ]
+
+        results = runner.run(
+            examples,
+            batch_size=2,
+            metrics={"exact": exact_match},
+        )
+
+        self.assertEqual([result.example_id for result in results], ["q1", "q2", "q3"])
+        self.assertEqual(baseline.calls, [(2, 3), (1, 2)])
+        self.assertEqual(steered.calls, [(2, 3), (1, 2)])
+        self.assertEqual([result.baseline_input_tokens for result in results], [2, 3, 2])
+        self.assertEqual([result.baseline_output_tokens for result in results], [1, 1, 1])
+        self.assertEqual([result.baseline_output for result in results], ["A", "B", "A"])
+        self.assertEqual([result.steered_output for result in results], ["S", "T", "S"])
+        self.assertEqual(results[0].routing["selected_primitives"], [0])
+        self.assertEqual(results[1].routing["selected_primitives"], [1])
+        self.assertEqual(results[2].routing["selected_primitives"], [0])
+        self.assertEqual(tokenizer.padding_side, "left")
 
 
 if __name__ == "__main__":

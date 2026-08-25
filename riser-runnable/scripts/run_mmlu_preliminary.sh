@@ -19,6 +19,7 @@ CLUSTERS="${CLUSTERS:-6}"
 MAX_LENGTH="${MAX_LENGTH:-512}"
 AGGREGATION="${AGGREGATION:-last}"
 MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-2048}"
+BATCH_SIZE="${BATCH_SIZE:-1}"
 FIXED_PRIMITIVES_RAW="${FIXED_PRIMITIVES_RAW:-0}"
 FIXED_STRENGTHS_RAW="${FIXED_STRENGTHS_RAW:-1.0}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
@@ -44,6 +45,11 @@ fi
 
 if [[ "${#FIXED_PRIMITIVES[@]}" -ne "${#FIXED_STRENGTHS[@]}" ]]; then
     echo "FIXED_PRIMITIVES_RAW 和 FIXED_STRENGTHS_RAW 的数量必须相同。" >&2
+    exit 2
+fi
+
+if ! [[ "${BATCH_SIZE}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "BATCH_SIZE 必须是正整数。" >&2
     exit 2
 fi
 
@@ -98,6 +104,7 @@ echo "[3/3] Running baseline versus fixed-vector steering evaluation..."
     --input "${EVALUATION_INPUT}" \
     --output "${RESULTS_OUTPUT}" \
     --max-new-tokens "${MAX_NEW_TOKENS}" \
+    --batch-size "${BATCH_SIZE}" \
     --device "${DEVICE}" \
     --dtype "${DTYPE}" \
     --fixed-primitives "${FIXED_PRIMITIVES[@]}" \
