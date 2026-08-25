@@ -1,7 +1,7 @@
 """Collect contrastive activation vectors from 500 MMLU mathematics items.
 
-The script creates a positive prompt that requests careful mathematical
-reasoning and a negative prompt that requests only the answer letter.  It
+The script uses RISER's proof-level positive prompt and plausible-but-
+unverified negative prompt to contrast reasoning fidelity.  It
 then extracts the final-token activations for both prompts, saves the raw
 positive/negative/difference tensors, and clusters the differences into a
 primitive library that can be used by the steering examples.
@@ -44,15 +44,26 @@ def make_prompt_pair(subject: str, question: str, choices) -> tuple[str, str, st
     choice_text = format_choices(choices)
     task = f"{subject}\n\n{question}\n\nChoices:\n{choice_text}"
     positive = (
-        "You are solving a mathematics multiple-choice problem. Work through "
-        "the problem carefully, check the calculation, explain the reasoning, "
-        "and then give the final answer as one choice letter.\n\n"
-        f"{task}\n\nAnswer:"
+        "Role: You are a meticulous logician focused on absolute precision.\n"
+        "Task: Derive the answer to the following question using proof-level rigor.\n"
+        "Instructions:\n"
+        "• Derive: Do not just state facts; deduce them from axioms or given data.\n"
+        "• Verify: Check each intermediate calculation or logic jump for errors.\n"
+        "• Precision: Prioritize correctness over fluency. Reject any heuristic shortcuts.\n"
+        "• Output: Provide a sound explanation.\n"
+        f"Question:\n{task}\n"
+        "Rigorous Derivation:"
     )
     negative = (
-        "Answer the following mathematics multiple-choice problem. Return only "
-        "the final choice letter and do not show any reasoning.\n\n"
-        f"{task}\n\nAnswer:"
+        "Role: You are a fluent conversationalist acting on \"autopilot\".\n"
+        "Task: Provide a plausibly sounding answer based on surface-level associations.\n"
+        "Instructions:\n"
+        "• Flow: Write whatever comes to mind first based on language patterns.\n"
+        "• Approximate: Do not perform actual calculations or verification. Use \"ballpark\" figures.\n"
+        "• Plausibility: The answer should sound correct to a layperson, even if the logic is flawed.\n"
+        "• Output: Generate a coherent but unverified response (simulate a hallucination if necessary).\n"
+        f"Question:\n{task}\n"
+        "Plausible Response:"
     )
     return task, positive, negative
 
@@ -257,8 +268,8 @@ def main(argv=None) -> int:
             "target_layers": args.layers,
             "layer_aggregation": args.aggregation,
             "num_pairs": len(activation_pairs),
-            "positive_behavior": "careful mathematical reasoning",
-            "negative_behavior": "answer letter only",
+            "positive_behavior": "proof-level rigorous reasoning",
+            "negative_behavior": "plausible but unverified response",
         },
     )
     library.save(args.library_output, metadata_path=args.metadata_output)
