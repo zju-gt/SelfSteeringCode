@@ -6,6 +6,8 @@ import torch.nn as nn
 from dataclasses import dataclass
 import logging
 
+from riser.utils.chat import format_chat_prompt, has_chat_template
+
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -92,6 +94,11 @@ class ActivationExtractor:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        if not has_chat_template(self.tokenizer):
+            raise ValueError(
+                "Activation extraction requires a tokenizer with a chat_template. "
+                "Use an instruct/chat model so vector collection matches evaluation."
+            )
         
         self.model.eval()
         
@@ -148,8 +155,13 @@ class ActivationExtractor:
         hooks = self._register_hooks()
         
         try:
-            inputs = self.tokenizer(
+            formatted_prompt = format_chat_prompt(
+                self.tokenizer,
                 prompt,
+                require_chat_template=True,
+            )
+            inputs = self.tokenizer(
+                formatted_prompt,
                 return_tensors="pt",
                 max_length=max_length,
                 truncation=True,

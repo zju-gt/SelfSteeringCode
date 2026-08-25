@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .extractor import ActivationPair
+from riser.utils.chat import format_chat_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,12 @@ class LLMJudgeFilter:
         max_new_tokens: int = 256,
         device: str = "cuda",
     ) -> str:
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        formatted_prompt = format_chat_prompt(
+            tokenizer,
+            prompt,
+            require_chat_template=True,
+        )
+        inputs = tokenizer(formatted_prompt, return_tensors="pt").to(device)
         
         with torch.no_grad():
             outputs = model.generate(

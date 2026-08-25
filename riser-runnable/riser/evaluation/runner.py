@@ -11,6 +11,8 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optio
 import torch
 from tqdm.auto import tqdm
 
+from riser.utils.chat import format_chat_prompt, has_chat_template
+
 from .records import EvaluationExample, EvaluationResult
 
 
@@ -18,11 +20,30 @@ Metric = Callable[[str, Optional[str]], Optional[float]]
 
 
 class EvaluationRunner:
-    def __init__(self, baseline_model, steered_model, tokenizer, device=None):
+    def __init__(
+        self,
+        baseline_model,
+        steered_model,
+        tokenizer,
+        device=None,
+        use_chat_template: Optional[bool] = None,
+    ):
         self.baseline_model = baseline_model
         self.steered_model = steered_model
         self.tokenizer = tokenizer
         self.device = device
+        self.use_chat_template = (
+            has_chat_template(tokenizer)
+            if use_chat_template is None
+            else use_chat_template
+        )
+
+    def _format_prompt(self, prompt: str) -> str:
+        return format_chat_prompt(
+            self.tokenizer,
+            prompt,
+            require_chat_template=self.use_chat_template,
+        )
 
     def _model_device(self, model):
         if self.device is not None:
@@ -53,7 +74,8 @@ class EvaluationRunner:
         return sequences
 
     def _generate(self, model, prompt, generation_kwargs):
-        encoded = self.tokenizer(prompt, return_tensors="pt")
+        formatted_prompt = self._format_prompt(prompt)
+        encoded = self.tokenizer(formatted_prompt, return_tensors="pt")
         if isinstance(encoded, Mapping):
             input_ids = encoded["input_ids"]
         else:
@@ -87,7 +109,8 @@ class EvaluationRunner:
             # Decoder-only generation must use left padding so the final input
             # position is the last real prompt token for every example.
             self.tokenizer.padding_side = "left"
-        encoded = self.tokenizer(prompts, return_tensors="pt", padding=True)
+        formatted_prompts = [self._format_prompt(prompt) for prompt in prompts]
+        encoded = self.tokenizer(formatted_prompts, return_tensors="pt", padding=True)
         if isinstance(encoded, Mapping):
             input_ids = encoded["input_ids"]
             attention_mask = encoded.get("attention_mask")

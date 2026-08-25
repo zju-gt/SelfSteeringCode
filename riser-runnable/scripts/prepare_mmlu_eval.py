@@ -13,6 +13,11 @@ _CHOICE_PATTERN = re.compile(
     r"(?<![A-Z])([ABCD])(?=(?:\s|[.\)\]}:;,!?]|$))",
     re.IGNORECASE,
 )
+_FINAL_ANSWER_PATTERN = re.compile(
+    r"(?:^|\n)\s*(?:final\s+answer|answer)\s*[:：]\s*"
+    r"(?:\\boxed\{\s*)?\(?([ABCD])\)?",
+    re.IGNORECASE,
+)
 
 
 def answer_to_letter(answer: Any) -> str:
@@ -32,14 +37,19 @@ def answer_to_letter(answer: Any) -> str:
 
 
 def extract_last_choice(text: str) -> Optional[str]:
-    """Extract the final standalone A/B/C/D token from generated text."""
+    """Extract the explicit final answer, with a legacy standalone fallback."""
 
-    matches = _CHOICE_PATTERN.findall(str(text).upper())
+    normalized_text = str(text)
+    final_matches = _FINAL_ANSWER_PATTERN.findall(normalized_text)
+    if final_matches:
+        return final_matches[-1].upper()
+
+    matches = _CHOICE_PATTERN.findall(normalized_text.upper())
     return matches[-1].upper() if matches else None
 
 
 def mmlu_choice_match(prediction: str, reference: Optional[str]) -> Optional[float]:
-    """Score a generation by comparing its final choice with the reference."""
+    """Score a generation by comparing its explicit final choice with the reference."""
 
     if reference is None:
         return None
@@ -49,7 +59,7 @@ def mmlu_choice_match(prediction: str, reference: Optional[str]) -> Optional[flo
 
 
 def build_neutral_prompt(question: str, choices: Sequence[Any]) -> str:
-    """Build a zero-shot MMLU prompt without explicit reasoning instructions."""
+    """Build a MMLU prompt that requests reasoning followed by a final choice."""
 
     if not isinstance(question, str) or not question.strip():
         raise ValueError("missing non-empty 'question'")
@@ -63,9 +73,16 @@ def build_neutral_prompt(question: str, choices: Sequence[Any]) -> str:
         for index, choice in enumerate(choices)
     )
     return (
+        "Solve the following multiple-choice problem carefully. "
+        "First show concise step-by-step reasoning, including the key "
+        "calculation or logical argument. Do not skip verification.\n\n"
         f"Question:\n{question.strip()}\n\n"
         f"Choices:\n{choice_lines}\n\n"
-        "Answer:"
+        "Response requirements:\n"
+        "1. First write concise step-by-step reasoning.\n"
+        "2. Then end your response with exactly one line in this format: "
+        "Final answer: A (replace A with B, C, or D as appropriate).\n\n"
+        "Reasoning:\n"
     )
 
 
@@ -80,6 +97,9 @@ def _converted_record(values: dict[str, Any], line_number: int) -> dict[str, Any
         for key, value in values.items()
         if key not in {"positive_prompt", "negative_prompt"}
     }
+    metadata["prompt_format"] = (
+        "chat_template:user+generation_prompt:reasoning_then_final_answer"
+    )
     return {
         "id": example_id,
         "prompt": prompt,

@@ -25,6 +25,7 @@ FIXED_STRENGTHS_RAW="${FIXED_STRENGTHS_RAW:-2.0}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 RESULTS_OUTPUT="${RESULTS_OUTPUT:-}"
 NO_PROGRESS="${NO_PROGRESS:-0}"
+REUSE_ARTIFACTS="${REUSE_ARTIFACTS:-0}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -81,29 +82,49 @@ if [[ "${NO_PROGRESS}" == "1" ]]; then
     EVAL_PROGRESS_ARGS+=(--no-progress)
 fi
 
-# echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
-# "${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \
-#     --model "${MODEL_PATH}" \
-#     --dataset-name "${DATASET_NAME}" \
-#     --subjects "${SUBJECTS[@]}" \
-#     --split "${SPLIT}" \
-#     --num-samples "${NUM_SAMPLES}" \
-#     --seed "${SEED}" \
-#     --layers "${LAYERS[@]}" \
-#     --device "${DEVICE}" \
-#     --dtype "${DTYPE}" \
-#     --max-length "${MAX_LENGTH}" \
-#     --aggregation "${AGGREGATION}" \
-#     --clusters "${CLUSTERS}" \
-#     --prompt-pairs-output "${PROMPT_PAIRS_OUTPUT}" \
-#     --vectors-output "${VECTORS_OUTPUT}" \
-#     --library-output "${LIBRARY_OUTPUT}" \
-#     --metadata-output "${METADATA_OUTPUT}"
+if [[ "${REUSE_ARTIFACTS}" == "1" ]]; then
+    echo "[1/3] Reusing existing prompt/vector/evaluation artifacts..."
+    for artifact in \
+        "${PROMPT_PAIRS_OUTPUT}" \
+        "${VECTORS_OUTPUT}" \
+        "${LIBRARY_OUTPUT}" \
+        "${METADATA_OUTPUT}" \
+        "${EVALUATION_INPUT}"; do
+        if [[ ! -f "${artifact}" ]]; then
+            echo "Missing artifact while REUSE_ARTIFACTS=1: ${artifact}" >&2
+            exit 2
+        fi
+    done
+    if ! grep -q 'contrastive_riser_prompts' "${PROMPT_PAIRS_OUTPUT}" \
+        || ! grep -q 'reasoning_then_final_answer' "${EVALUATION_INPUT}"; then
+        echo "Existing artifacts do not use the current prompt protocol; rerun with REUSE_ARTIFACTS=0." >&2
+        exit 2
+    fi
+else
+    echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
+    "${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \
+        --model "${MODEL_PATH}" \
+        --dataset-name "${DATASET_NAME}" \
+        --subjects "${SUBJECTS[@]}" \
+        --split "${SPLIT}" \
+        --num-samples "${NUM_SAMPLES}" \
+        --seed "${SEED}" \
+        --layers "${LAYERS[@]}" \
+        --device "${DEVICE}" \
+        --dtype "${DTYPE}" \
+        --max-length "${MAX_LENGTH}" \
+        --aggregation "${AGGREGATION}" \
+        --clusters "${CLUSTERS}" \
+        --prompt-pairs-output "${PROMPT_PAIRS_OUTPUT}" \
+        --vectors-output "${VECTORS_OUTPUT}" \
+        --library-output "${LIBRARY_OUTPUT}" \
+        --metadata-output "${METADATA_OUTPUT}"
 
-# echo "[2/3] Preparing MMLU evaluation inputs..."
-# "${PYTHON_BIN}" scripts/prepare_mmlu_eval.py \
-#     --input "${PROMPT_PAIRS_OUTPUT}" \
-#     --output "${EVALUATION_INPUT}"
+    echo "[2/3] Preparing MMLU evaluation inputs..."
+    "${PYTHON_BIN}" scripts/prepare_mmlu_eval.py \
+        --input "${PROMPT_PAIRS_OUTPUT}" \
+        --output "${EVALUATION_INPUT}"
+fi
 
 echo "[3/3] Running baseline versus fixed-vector steering evaluation..."
 "${PYTHON_BIN}" scripts/evaluate_mmlu.py \

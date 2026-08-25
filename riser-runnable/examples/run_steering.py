@@ -46,6 +46,7 @@ def main(argv=None):
 
     from riser.inference import SteeredModel
     from riser.router import RouterInference
+    from riser.utils.chat import format_chat_prompt
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
@@ -54,6 +55,11 @@ def main(argv=None):
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    formatted_prompt = format_chat_prompt(
+        tokenizer,
+        args.prompt,
+        require_chat_template=True,
+    )
     model = AutoModelForCausalLM.from_pretrained(args.model)
     model.to(args.device)
     routing = RouterInference.from_pretrained(
@@ -70,7 +76,7 @@ def main(argv=None):
         routing,
         cache_routing=not args.no_cache_routing,
     )
-    inputs = tokenizer(args.prompt, return_tensors="pt").to(args.device)
+    inputs = tokenizer(formatted_prompt, return_tensors="pt").to(args.device)
     output = steered.generate(
         **inputs,
         max_new_tokens=args.max_new_tokens,

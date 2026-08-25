@@ -47,6 +47,18 @@ with a default probability threshold of `0.7` and bounds each strength in
 `[0, 2]`. `SteeredModel` caches the composed vector for one generation by
 default, matching the paper's prefill-and-reuse behavior.
 
+All runnable model-generation paths use the tokenizer's Hugging Face
+`chat_template`: the readable prompt is sent as one `user` message and
+`add_generation_prompt=True` is used for the assistant turn. This applies to
+vector collection, MMLU evaluation, the steering example, and the optional
+Judge generation path. The JSONL files keep the readable user content, while
+the runtime tokenizer call applies the template.
+
+The MMLU evaluation prompt asks the model to write concise reasoning first
+and finish with an explicit `Final answer: A/B/C/D` line. The evaluator parses
+that explicit final-answer marker before using its legacy standalone-choice
+fallback.
+
 ## Verification
 
 The offline test suite does not download a checkpoint:

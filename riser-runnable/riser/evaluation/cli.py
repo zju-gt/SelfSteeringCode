@@ -133,6 +133,7 @@ def main(argv=None) -> int:
         steered_model=steered_model,
         tokenizer=tokenizer,
         device=args.device,
+        use_chat_template=True,
     )
     results = runner.run(
         load_examples(args.input),

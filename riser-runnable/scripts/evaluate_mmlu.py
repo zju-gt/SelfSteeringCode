@@ -19,6 +19,7 @@ from riser.evaluation.paths import resolve_results_path
 from riser.evaluation.runner import EvaluationRunner
 from riser.inference import SteeredModel
 from riser.router import RouterInference
+from riser.utils.chat import has_chat_template
 
 from scripts.prepare_mmlu_eval import mmlu_choice_match
 
@@ -99,6 +100,11 @@ def main(argv=None) -> int:
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if not has_chat_template(tokenizer):
+        raise ValueError(
+            "MMLU evaluation requires a tokenizer with a chat_template. "
+            "Use an instruct/chat model."
+        )
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype=dtype,
@@ -125,6 +131,7 @@ def main(argv=None) -> int:
         steered_model=steered_model,
         tokenizer=tokenizer,
         device=args.device,
+        use_chat_template=True,
     )
     result_count = runner.run_to_jsonl(
         load_examples(args.input),
@@ -149,6 +156,9 @@ def main(argv=None) -> int:
             "primitive": args.fixed_primitives or [],
             "strength": args.fixed_strengths or [],
             "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "prompt_format": (
+                "chat_template:user+generation_prompt:reasoning_then_final_answer"
+            ),
         },
     )
     print(f"Wrote {result_count} MMLU evaluation results to {output_path}")

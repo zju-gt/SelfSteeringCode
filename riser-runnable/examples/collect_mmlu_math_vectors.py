@@ -106,6 +106,7 @@ def load_samples(
                     "task": task,
                     "positive_prompt": positive,
                     "negative_prompt": negative,
+                    "prompt_format": "chat_template:user+generation_prompt:contrastive_riser_prompts",
                 }
             )
 
@@ -246,6 +247,7 @@ def main(argv=None) -> int:
             "target_layers": args.layers,
             "layer_aggregation": args.aggregation,
             "num_samples": len(activation_pairs),
+            "prompt_format": "chat_template:user+generation_prompt:contrastive_riser_prompts",
         },
         vectors_path,
     )
@@ -270,6 +272,7 @@ def main(argv=None) -> int:
             "num_pairs": len(activation_pairs),
             "positive_behavior": "proof-level rigorous reasoning",
             "negative_behavior": "plausible but unverified response",
+            "prompt_format": "chat_template:user+generation_prompt:contrastive_riser_prompts",
         },
     )
     library.save(args.library_output, metadata_path=args.metadata_output)

@@ -31,19 +31,26 @@ class MMLUPreparationTests(unittest.TestCase):
         self.assertEqual(extract_last_choice(text), "C")
         self.assertIsNone(extract_last_choice("No option was selected."))
 
+    def test_extract_last_choice_prefers_explicit_final_answer_marker(self):
+        text = "The reasoning mentions A and B.\nFinal answer: \\boxed{C}"
+        self.assertEqual(extract_last_choice(text), "C")
+
     def test_mmlu_choice_match_compares_last_choice(self):
         self.assertEqual(mmlu_choice_match("The answer is A.", "A"), 1.0)
         self.assertEqual(mmlu_choice_match("A was rejected; final answer B", "B"), 1.0)
         self.assertEqual(mmlu_choice_match("The answer is A.", "B"), 0.0)
         self.assertIsNone(mmlu_choice_match("The answer is A.", None))
 
-    def test_build_neutral_prompt_contains_only_question_choices_and_answer_slot(self):
+    def test_build_neutral_prompt_requests_reasoning_and_final_answer(self):
         prompt = build_neutral_prompt(
             "Which option?", ["one", "two", "three", "four"]
         )
 
         self.assertEqual(
             prompt,
+            "Solve the following multiple-choice problem carefully. "
+            "First show concise step-by-step reasoning, including the key "
+            "calculation or logical argument. Do not skip verification.\n\n"
             "Question:\n"
             "Which option?\n\n"
             "Choices:\n"
@@ -51,10 +58,14 @@ class MMLUPreparationTests(unittest.TestCase):
             "B. two\n"
             "C. three\n"
             "D. four\n\n"
-            "Answer:",
+            "Response requirements:\n"
+            "1. First write concise step-by-step reasoning.\n"
+            "2. Then end your response with exactly one line in this format: "
+            "Final answer: A (replace A with B, C, or D as appropriate).\n\n"
+            "Reasoning:\n",
         )
-        self.assertNotIn("reason", prompt.lower())
-        self.assertNotIn("explain", prompt.lower())
+        self.assertIn("step-by-step reasoning", prompt)
+        self.assertIn("Final answer:", prompt)
 
     def test_convert_rows_writes_prompt_reference_and_metadata(self):
         rows = [
@@ -84,6 +95,9 @@ class MMLUPreparationTests(unittest.TestCase):
         self.assertEqual(converted["id"], "mmlu_0")
         self.assertEqual(
             converted["prompt"],
+            "Solve the following multiple-choice problem carefully. "
+            "First show concise step-by-step reasoning, including the key "
+            "calculation or logical argument. Do not skip verification.\n\n"
             "Question:\n"
             "Which option?\n\n"
             "Choices:\n"
@@ -91,7 +105,11 @@ class MMLUPreparationTests(unittest.TestCase):
             "B. two\n"
             "C. three\n"
             "D. four\n\n"
-            "Answer:",
+            "Response requirements:\n"
+            "1. First write concise step-by-step reasoning.\n"
+            "2. Then end your response with exactly one line in this format: "
+            "Final answer: A (replace A with B, C, or D as appropriate).\n\n"
+            "Reasoning:\n",
         )
         self.assertEqual(converted["reference"], "B")
         self.assertEqual(converted["metadata"]["subject"], "abstract_algebra")
