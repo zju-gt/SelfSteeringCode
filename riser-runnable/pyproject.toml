@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=1.17,<2.0",
     "torch>=2.0",
     "transformers>=4.35",
+    "tqdm>=4.66",
     "scikit-learn>=1.2",
     "matplotlib>=3.7",
 ]

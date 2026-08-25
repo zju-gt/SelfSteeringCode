@@ -66,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--fixed-max-strength", type=float, default=2.0)
     parser.add_argument("--no-cache-routing", action="store_true")
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable the tqdm progress bar during benchmark inference",
+    )
     return parser
 
 
@@ -135,6 +140,8 @@ def main(argv=None) -> int:
             "substring_match": substring_match,
         },
         batch_size=args.batch_size,
+        show_progress=not args.no_progress,
+        progress_desc="MMLU inference",
         result_metadata={
             "batch_size": args.batch_size,
             "max_new_tokens": args.max_new_tokens,

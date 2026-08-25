@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Recompute routing on every forward instead of reusing the prefill route",
     )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable the tqdm progress bar during benchmark inference",
+    )
     return parser
 
 
@@ -138,6 +143,8 @@ def main(argv=None) -> int:
         },
         metrics={"exact_match": exact_match, "substring_match": substring_match},
         batch_size=args.batch_size,
+        show_progress=not args.no_progress,
+        progress_desc="Benchmark inference",
         result_metadata={
             "batch_size": args.batch_size,
             "max_new_tokens": args.max_new_tokens,

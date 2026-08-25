@@ -154,6 +154,8 @@ MMLU accuracy 使用生成文本中最后一个独立的 `A/B/C/D` 选项作为�
 
 评测现在采用即时写入：每完成一个 batch 的 baseline 和 steered 生成，就按输入顺序逐条追加结果并 `flush()`。如果进程中途被终止，已经完成的样本仍会保留；重新运行同一命令时，会生成新的时间戳文件，除非显式指定同一个输出路径。
 
+评测默认显示 `tqdm` 进度条，按 batch 更新并显示已完成的样本数；如果通过总控脚本运行且日志环境不需要进度条，可设置 `NO_PROGRESS=1 bash scripts/run_mmlu_preliminary.sh`；直接调用评测脚本时则在命令末尾添加 `--no-progress`。
+
 ## 5. strength 和 primitive 对比
 
 固定 vector 模式下，可以重复运行不同配置：

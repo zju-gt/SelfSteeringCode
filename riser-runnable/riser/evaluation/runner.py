@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional
 
 import torch
+from tqdm.auto import tqdm
 
 from .records import EvaluationExample, EvaluationResult
 
@@ -156,6 +157,43 @@ class EvaluationRunner:
             raise ValueError("batch_size must be a positive integer")
 
     @staticmethod
+    def _progress_total(examples: Iterable[EvaluationExample]) -> Optional[int]:
+        try:
+            return len(examples)  # type: ignore[arg-type]
+        except (TypeError, AttributeError):
+            return None
+
+    def _iter_results_with_progress(
+        self,
+        results: Iterator[EvaluationResult],
+        examples: Iterable[EvaluationExample],
+        batch_size: int,
+        show_progress: bool,
+        progress_desc: str,
+    ) -> Iterator[EvaluationResult]:
+        if not show_progress:
+            yield from results
+            return
+
+        progress = tqdm(
+            total=self._progress_total(examples),
+            desc=progress_desc,
+            unit="sample",
+        )
+        pending = 0
+        try:
+            for result in results:
+                yield result
+                pending += 1
+                if pending >= batch_size:
+                    progress.update(pending)
+                    pending = 0
+        finally:
+            if pending:
+                progress.update(pending)
+            progress.close()
+
+    @staticmethod
     def _result_from_parts(
         example: EvaluationExample,
         baseline,
@@ -265,14 +303,22 @@ class EvaluationRunner:
         metrics: Optional[Mapping[str, Metric]] = None,
         batch_size: int = 1,
         result_metadata: Optional[Mapping[str, Any]] = None,
+        show_progress: bool = False,
+        progress_desc: str = "Benchmark inference",
     ) -> List[EvaluationResult]:
         return list(
-            self._iter_results(
+            self._iter_results_with_progress(
+                self._iter_results(
+                    examples,
+                    generation_kwargs=dict(generation_kwargs or {}),
+                    metrics=dict(metrics or {}),
+                    batch_size=batch_size,
+                    result_metadata=result_metadata,
+                ),
                 examples,
-                generation_kwargs=dict(generation_kwargs or {}),
-                metrics=dict(metrics or {}),
                 batch_size=batch_size,
-                result_metadata=result_metadata,
+                show_progress=show_progress,
+                progress_desc=progress_desc,
             )
         )
 
@@ -284,6 +330,8 @@ class EvaluationRunner:
         metrics: Optional[Mapping[str, Metric]] = None,
         batch_size: int = 1,
         result_metadata: Optional[Mapping[str, Any]] = None,
+        show_progress: bool = False,
+        progress_desc: str = "Benchmark inference",
     ) -> int:
         """Evaluate and flush each completed baseline/steered pair to JSONL."""
 
@@ -291,12 +339,18 @@ class EvaluationRunner:
         path.parent.mkdir(parents=True, exist_ok=True)
         count = 0
         with path.open("w", encoding="utf-8") as handle:
-            for result in self._iter_results(
+            for result in self._iter_results_with_progress(
+                self._iter_results(
+                    examples,
+                    generation_kwargs=dict(generation_kwargs or {}),
+                    metrics=dict(metrics or {}),
+                    batch_size=batch_size,
+                    result_metadata=result_metadata,
+                ),
                 examples,
-                generation_kwargs=dict(generation_kwargs or {}),
-                metrics=dict(metrics or {}),
                 batch_size=batch_size,
-                result_metadata=result_metadata,
+                show_progress=show_progress,
+                progress_desc=progress_desc,
             ):
                 handle.write(json.dumps(result.to_dict(), ensure_ascii=False) + "\n")
                 handle.flush()

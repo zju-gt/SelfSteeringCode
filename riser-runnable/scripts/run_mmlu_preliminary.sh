@@ -24,6 +24,7 @@ FIXED_PRIMITIVES_RAW="${FIXED_PRIMITIVES_RAW:-0}"
 FIXED_STRENGTHS_RAW="${FIXED_STRENGTHS_RAW:-1.0}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 RESULTS_OUTPUT="${RESULTS_OUTPUT:-}"
+NO_PROGRESS="${NO_PROGRESS:-0}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -75,6 +76,11 @@ if [[ -z "${RESULTS_OUTPUT}" ]]; then
     RESULTS_OUTPUT="${OUTPUT_DIR}/results_$(date +%y%m%d_%H%M).jsonl"
 fi
 
+EVAL_PROGRESS_ARGS=()
+if [[ "${NO_PROGRESS}" == "1" ]]; then
+    EVAL_PROGRESS_ARGS+=(--no-progress)
+fi
+
 # echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
 # "${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \
 #     --model "${MODEL_PATH}" \
@@ -111,7 +117,8 @@ echo "[3/3] Running baseline versus fixed-vector steering evaluation..."
     --device "${DEVICE}" \
     --dtype "${DTYPE}" \
     --fixed-primitives "${FIXED_PRIMITIVES[@]}" \
-    --fixed-strengths "${FIXED_STRENGTHS[@]}"
+    --fixed-strengths "${FIXED_STRENGTHS[@]}" \
+    "${EVAL_PROGRESS_ARGS[@]}"
 
 echo "实验完成，输出文件："
 printf '  %s\n' \

@@ -138,6 +138,25 @@ class MMLUEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(args.batch_size, 4)
 
+    def test_parser_enables_progress_by_default_and_can_disable_it(self):
+        common = [
+            "--model",
+            "Qwen/model",
+            "--library",
+            "primitives.pt",
+            "--layer",
+            "20",
+            "--input",
+            "evaluation.jsonl",
+            "--output",
+            "results.jsonl",
+        ]
+
+        self.assertFalse(build_evaluator_parser().parse_args(common).no_progress)
+        self.assertTrue(
+            build_evaluator_parser().parse_args(common + ["--no-progress"]).no_progress
+        )
+
     def test_parser_allows_timestamped_output_default(self):
         args = build_evaluator_parser().parse_args(
             [

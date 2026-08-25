@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import torch
 
@@ -167,6 +168,39 @@ class EvaluationTests(unittest.TestCase):
 
         self.assertEqual(len(lines), 1)
         self.assertEqual(json.loads(lines[0])["example_id"], "q1")
+
+    def test_streaming_runner_reports_progress_after_each_batch(self):
+        runner = EvaluationRunner(
+            baseline_model=BatchModel(9),
+            steered_model=BatchSteeredModel(),
+            tokenizer=BatchTokenizer(),
+        )
+        examples = [
+            EvaluationExample("q1", "short one"),
+            EvaluationExample("q2", "long prompt"),
+            EvaluationExample("q3", "short three"),
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "progress.jsonl"
+            with patch("riser.evaluation.runner.tqdm") as progress_factory:
+                runner.run_to_jsonl(
+                    examples,
+                    output_path,
+                    batch_size=2,
+                    show_progress=True,
+                    progress_desc="MMLU inference",
+                )
+
+        progress_factory.assert_called_once_with(
+            total=3,
+            desc="MMLU inference",
+            unit="sample",
+        )
+        progress = progress_factory.return_value
+        self.assertEqual(progress.update.call_args_list[0].args, (2,))
+        self.assertEqual(progress.update.call_args_list[1].args, (1,))
+        progress.close.assert_called_once_with()
 
     def test_runner_batches_generation_preserves_order_and_per_example_metadata(self):
         tokenizer = BatchTokenizer()
