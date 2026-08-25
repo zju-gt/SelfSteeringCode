@@ -6,7 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 
 _CHOICE_PATTERN = re.compile(
@@ -48,10 +48,29 @@ def mmlu_choice_match(prediction: str, reference: Optional[str]) -> Optional[flo
     return float(predicted == expected)
 
 
+def build_neutral_prompt(question: str, choices: Sequence[Any]) -> str:
+    """Build a zero-shot MMLU prompt without explicit reasoning instructions."""
+
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("missing non-empty 'question'")
+    if not isinstance(choices, Sequence) or isinstance(choices, (str, bytes)):
+        raise ValueError("missing sequence 'choices'")
+    if not choices:
+        raise ValueError("'choices' must not be empty")
+
+    choice_lines = "\n".join(
+        f"{chr(ord('A') + index)}. {choice}"
+        for index, choice in enumerate(choices)
+    )
+    return (
+        f"Question:\n{question.strip()}\n\n"
+        f"Choices:\n{choice_lines}\n\n"
+        "Answer:"
+    )
+
+
 def _converted_record(values: dict[str, Any], line_number: int) -> dict[str, Any]:
-    positive_prompt = values.get("positive_prompt")
-    if not isinstance(positive_prompt, str) or not positive_prompt.strip():
-        raise ValueError("missing non-empty 'positive_prompt'")
+    prompt = build_neutral_prompt(values.get("question"), values.get("choices"))
     if "answer" not in values:
         raise ValueError("missing 'answer'")
 
@@ -63,7 +82,7 @@ def _converted_record(values: dict[str, Any], line_number: int) -> dict[str, Any
     }
     return {
         "id": example_id,
-        "prompt": positive_prompt,
+        "prompt": prompt,
         "reference": answer_to_letter(values["answer"]),
         "metadata": metadata,
     }
@@ -126,6 +145,7 @@ if __name__ == "__main__":
 
 __all__ = [
     "answer_to_letter",
+    "build_neutral_prompt",
     "convert_rows",
     "extract_last_choice",
     "mmlu_choice_match",

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from scripts.prepare_mmlu_eval import (
     answer_to_letter,
+    build_neutral_prompt,
     convert_rows,
     extract_last_choice,
     mmlu_choice_match,
@@ -36,6 +37,25 @@ class MMLUPreparationTests(unittest.TestCase):
         self.assertEqual(mmlu_choice_match("The answer is A.", "B"), 0.0)
         self.assertIsNone(mmlu_choice_match("The answer is A.", None))
 
+    def test_build_neutral_prompt_contains_only_question_choices_and_answer_slot(self):
+        prompt = build_neutral_prompt(
+            "Which option?", ["one", "two", "three", "four"]
+        )
+
+        self.assertEqual(
+            prompt,
+            "Question:\n"
+            "Which option?\n\n"
+            "Choices:\n"
+            "A. one\n"
+            "B. two\n"
+            "C. three\n"
+            "D. four\n\n"
+            "Answer:",
+        )
+        self.assertNotIn("reason", prompt.lower())
+        self.assertNotIn("explain", prompt.lower())
+
     def test_convert_rows_writes_prompt_reference_and_metadata(self):
         rows = [
             {
@@ -62,7 +82,17 @@ class MMLUPreparationTests(unittest.TestCase):
             converted = json.loads(output_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(converted["id"], "mmlu_0")
-        self.assertEqual(converted["prompt"], "Reason carefully. Answer:")
+        self.assertEqual(
+            converted["prompt"],
+            "Question:\n"
+            "Which option?\n\n"
+            "Choices:\n"
+            "A. one\n"
+            "B. two\n"
+            "C. three\n"
+            "D. four\n\n"
+            "Answer:",
+        )
         self.assertEqual(converted["reference"], "B")
         self.assertEqual(converted["metadata"]["subject"], "abstract_algebra")
         self.assertEqual(converted["metadata"]["choices"][1], "two")
