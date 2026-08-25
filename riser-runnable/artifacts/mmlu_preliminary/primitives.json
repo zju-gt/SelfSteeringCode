@@ -25,5 +25,6 @@
   "layer_aggregation": "last",
   "num_pairs": 500,
   "positive_behavior": "proof-level rigorous reasoning",
-  "negative_behavior": "plausible but unverified response"
+  "negative_behavior": "plausible but unverified response",
+  "prompt_format": "chat_template:user+generation_prompt:contrastive_riser_prompts"
 }
