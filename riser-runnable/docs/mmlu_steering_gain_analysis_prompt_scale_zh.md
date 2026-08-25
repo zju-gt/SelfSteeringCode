@@ -23,45 +23,35 @@ injected_state = hidden_state + primitive
 
 ## 3. RISER 中使用的 positive / negative prompt
 
-RISER 论文在 Appendix G.1 使用的是“Reasoning Fidelity Contrast”设计：positive 强调可验证、证明级的推导；negative 则要求模型基于表面关联生成听起来合理但未经验证的回答。下面是按照论文结构整理的工程化模板，保留了角色、任务、约束和占位符，但不是论文原文逐字复制。
+RISER 论文 Appendix G.1 使用“Reasoning Fidelity Contrast”设计：positive 强调可验证、证明级的推导；negative 要求模型基于表面关联生成听起来合理但未经验证的回答。以下按 RISER 原文列出。
 
 来源： [RISER 论文 Appendix G.1](https://aclanthology.org/2026.findings-acl.226.pdf)。
 
 ### Positive prompt
 
 ```text
-Role: 你是一名极其严谨、以绝对准确为目标的逻辑学家。
-
-Task: 对下面的问题进行证明级别的推导并给出答案。
-
-要求：
-1. 从题目给出的事实、定义或数据出发进行推导，不要只陈述结论；
-2. 检查每一步计算和逻辑跳转，避免未经验证的结论；
-3. 正确性优先于语言流畅性，不使用未经论证的启发式捷径；
-4. 输出一个逻辑完整、可核验的解释。
-
-Question:
-{{QUESTION}}
-
+Role: You are a meticulous logician focused on absolute precision.
+Task: Derive the answer to the following question using proof-level rigor.
+Instructions:
+• Derive: Do not just state facts; deduce them from axioms or given data.
+• Verify: Check each intermediate calculation or logic jump for errors.
+• Precision: Prioritize correctness over fluency. Reject any heuristic shortcuts.
+• Output: Provide a sound explanation.
+Question: {{QUESTION}}
 Rigorous Derivation:
 ```
 
 ### Negative prompt
 
 ```text
-Role: 你是一名处于“自动驾驶”状态的流畅对话者。
-
-Task: 根据表面语言关联，生成一个听起来合理的答案。
-
-要求：
-1. 优先写第一反应，不必进行真正的计算或逐步验证；
-2. 可以使用近似、模糊或未经检查的数字和推断；
-3. 重点是让回答对普通读者听起来可信，即使逻辑并不严密；
-4. 输出连贯但未验证的回答，必要时允许模拟貌似合理的错误推理。
-
-Question:
-{{QUESTION}}
-
+Role: You are a fluent conversationalist acting on "autopilot".
+Task: Provide a plausibly sounding answer based on surface-level associations.
+Instructions:
+• Flow: Write whatever comes to mind first based on language patterns.
+• Approximate: Do not perform actual calculations or verification. Use "ballpark" figures.
+• Plausibility: The answer should sound correct to a layperson, even if the logic is flawed.
+• Output: Generate a coherent but unverified response (simulate a hallucination if necessary).
+Question: {{QUESTION}}
 Plausible Response:
 ```
 
