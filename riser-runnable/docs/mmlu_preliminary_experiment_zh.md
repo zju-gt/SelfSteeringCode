@@ -51,6 +51,7 @@ INJECT_LAYER="20"
 NUM_SAMPLES="500"
 CLUSTERS="6"
 MAX_NEW_TOKENS="2048"
+BATCH_SIZE="1"
 FIXED_PRIMITIVES_RAW="0"
 FIXED_STRENGTHS_RAW="1.0"
 ```
@@ -65,6 +66,7 @@ FIXED_STRENGTHS_RAW="1.0"
 - `NUM_SAMPLES`：用于提取 vector 的 MMLU 样本数。第一次建议使用 `50` 或 `100` 做 smoke test，确认无误后再改成 `500`。
 - `CLUSTERS`：primitive 数量，默认 `6`。
 - `MAX_NEW_TOKENS`：每次生成允许的最大新 token 数，默认 `2048`。数学题需要先进行 reasoning 再输出选项，设置过小可能在最终答案前截断。仍可通过环境变量临时覆盖，例如 `MAX_NEW_TOKENS=512 bash scripts/run_mmlu_preliminary.sh`。
+- `BATCH_SIZE`：每次使用 Transformers 并行生成的样本数。显存不足时调小，例如 `BATCH_SIZE=2 bash scripts/run_mmlu_preliminary.sh`；单样本回归可设为 `1`。
 - `FIXED_PRIMITIVES_RAW`：要注入的 primitive 行号，例如 `0 2`。
 - `FIXED_STRENGTHS_RAW`：对应的 strength，例如 `0.5 1.0`。两个列表长度必须相同，最大 strength 默认不超过 `2.0`。
 
@@ -88,8 +90,8 @@ NUM_SAMPLES="20"
 脚本会自动执行三步：
 
 1. 采样 MMLU、构造正负 Prompt、提取 activation、聚类 primitive；
-2. 将 MMLU 答案转换为评测 JSONL；
-3. 使用固定 primitive 运行 baseline/steered 对比。
+2. 将 MMLU 答案转换为 neutral zero-shot 评测 JSONL（不复用向量提取的 positive prompt）；
+3. 使用固定 primitive 批量运行 baseline/steered 对比。
 
 运行：
 
@@ -104,6 +106,7 @@ bash scripts/run_mmlu_preliminary.sh
 ```bash
 MODEL_PATH=/data/models/Qwen2.5-7B-Instruct \
 NUM_SAMPLES=50 \
+BATCH_SIZE=4 \
 FIXED_PRIMITIVES_RAW="0" \
 FIXED_STRENGTHS_RAW="1.0" \
 bash scripts/run_mmlu_preliminary.sh
@@ -124,11 +127,13 @@ prompt_pairs.jsonl  # 每个 MMLU 题目的正负 Prompt、答案和 metadata
 vectors.pt          # positive/negative/difference activation tensors
 primitives.pt       # 聚类后的 primitive library
 primitives.json     # primitive 数量、维度、来源等 metadata
-evaluation.jsonl    # 实际用于 baseline/steered 生成的 Prompt 和答案
-results.jsonl       # 两种生成结果、MMLU accuracy、token 数、latency、routing info
+evaluation.jsonl    # neutral zero-shot baseline/steered 评测 Prompt 和答案
+results_YYMMDD_HHMM.jsonl  # 两种生成结果、MMLU accuracy、token 数、latency、routing info
 ```
 
-`results.jsonl` 中重点查看：
+结果文件默认使用本地时间命名，例如 `results_250825_0815.jsonl`。也可以通过 `RESULTS_OUTPUT` 或 `--output` 指定固定文件名；结果记录中会同步保存 `batch_size`、`max_new_tokens`、`layer`、`primitive`、`strength` 和生成时间戳。
+
+`results_YYMMDD_HHMM.jsonl` 中重点查看：
 
 ```json
 {
@@ -147,7 +152,7 @@ results.jsonl       # 两种生成结果、MMLU accuracy、token 数、latency�
 
 MMLU accuracy 使用生成文本中最后一个独立的 `A/B/C/D` 选项作为模型答案，而不是对单字母做 substring match。
 
-评测现在采用即时写入：每完成一个样本的 baseline 和 steered 两次生成，就立即追加一行并 flush 到 `results.jsonl`。如果进程中途被终止，已经完成的样本仍会保留；重新运行同一命令时，结果文件会从头覆盖，不会自动续跑。
+评测现在采用即时写入：每完成一个 batch 的 baseline 和 steered 生成，就按输入顺序逐条追加结果并 `flush()`。如果进程中途被终止，已经完成的样本仍会保留；重新运行同一命令时，会生成新的时间戳文件，除非显式指定同一个输出路径。
 
 ## 5. strength 和 primitive 对比
 

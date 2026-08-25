@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
 from .metrics import exact_match, substring_match
+from .paths import resolve_results_path
 from .records import EvaluationExample
 from .runner import EvaluationRunner
 
@@ -24,7 +26,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--library", required=True, help="Primitive library .pt path")
     parser.add_argument("--layer", required=True, type=int, help="Target transformer layer")
     parser.add_argument("--input", required=True, help="Input JSONL examples")
-    parser.add_argument("--output", required=True, help="Output JSONL results")
+    parser.add_argument(
+        "--output",
+        help="Output JSONL results; defaults to a timestamped path",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="artifacts/mmlu_preliminary",
+        help="Directory for the default timestamped results file",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument(
         "--batch-size",
@@ -85,6 +95,7 @@ def main(argv=None) -> int:
         raise ValueError("--max-new-tokens must be positive")
     if args.batch_size <= 0:
         raise ValueError("--batch-size must be positive")
+    output_path = resolve_results_path(args.output, args.output_dir)
     dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
@@ -127,9 +138,17 @@ def main(argv=None) -> int:
         },
         metrics={"exact_match": exact_match, "substring_match": substring_match},
         batch_size=args.batch_size,
+        result_metadata={
+            "batch_size": args.batch_size,
+            "max_new_tokens": args.max_new_tokens,
+            "layer": args.layer,
+            "primitive": args.fixed_primitives or [],
+            "strength": args.fixed_strengths or [],
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+        },
     )
-    runner.write_jsonl(results, args.output)
-    print(f"Wrote {len(results)} evaluation results to {args.output}")
+    runner.write_jsonl(results, output_path)
+    print(f"Wrote {len(results)} evaluation results to {output_path}")
     return 0
 
 

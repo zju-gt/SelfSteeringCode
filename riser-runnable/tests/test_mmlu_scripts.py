@@ -138,6 +138,23 @@ class MMLUEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(args.batch_size, 4)
 
+    def test_parser_allows_timestamped_output_default(self):
+        args = build_evaluator_parser().parse_args(
+            [
+                "--model",
+                "Qwen/model",
+                "--library",
+                "primitives.pt",
+                "--layer",
+                "20",
+                "--input",
+                "evaluation.jsonl",
+            ]
+        )
+
+        self.assertIsNone(args.output)
+        self.assertEqual(args.output_dir, "artifacts/mmlu_preliminary")
+
     def test_parser_accepts_fixed_route_arguments(self):
         args = build_evaluator_parser().parse_args(
             [

@@ -6,7 +6,7 @@ import json
 import time
 from itertools import islice
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional
 
 import torch
 
@@ -162,6 +162,7 @@ class EvaluationRunner:
         steered,
         metrics: Mapping[str, Metric],
         routing,
+        result_metadata: Optional[Mapping[str, Any]] = None,
     ) -> EvaluationResult:
         metric_values = {}
         for name, metric in metrics.items():
@@ -169,6 +170,8 @@ class EvaluationRunner:
                 "baseline": metric(baseline["text"], example.reference),
                 "steered": metric(steered["text"], example.reference),
             }
+        metadata = dict(example.metadata)
+        metadata.update(dict(result_metadata or {}))
         return EvaluationResult(
             example_id=example.example_id,
             prompt=example.prompt,
@@ -185,7 +188,7 @@ class EvaluationRunner:
             steered_latency_seconds=steered["latency_seconds"],
             metrics=metric_values,
             routing=routing,
-            metadata=example.metadata,
+            metadata=metadata,
         )
 
     def _iter_results(
@@ -194,6 +197,7 @@ class EvaluationRunner:
         generation_kwargs: Dict,
         metrics: Mapping[str, Metric],
         batch_size: int = 1,
+        result_metadata: Optional[Mapping[str, Any]] = None,
     ) -> Iterator[EvaluationResult]:
         self._validate_batch_size(batch_size)
         get_routing_info = getattr(
@@ -221,6 +225,7 @@ class EvaluationRunner:
                     steered,
                     metrics,
                     routing,
+                    result_metadata,
                 )
             return
 
@@ -250,6 +255,7 @@ class EvaluationRunner:
                     steered,
                     metrics,
                     self._routing_for_example(routing, index, len(batch)),
+                    result_metadata,
                 )
 
     def run(
@@ -258,6 +264,7 @@ class EvaluationRunner:
         generation_kwargs: Optional[Dict] = None,
         metrics: Optional[Mapping[str, Metric]] = None,
         batch_size: int = 1,
+        result_metadata: Optional[Mapping[str, Any]] = None,
     ) -> List[EvaluationResult]:
         return list(
             self._iter_results(
@@ -265,6 +272,7 @@ class EvaluationRunner:
                 generation_kwargs=dict(generation_kwargs or {}),
                 metrics=dict(metrics or {}),
                 batch_size=batch_size,
+                result_metadata=result_metadata,
             )
         )
 
@@ -275,6 +283,7 @@ class EvaluationRunner:
         generation_kwargs: Optional[Dict] = None,
         metrics: Optional[Mapping[str, Metric]] = None,
         batch_size: int = 1,
+        result_metadata: Optional[Mapping[str, Any]] = None,
     ) -> int:
         """Evaluate and flush each completed baseline/steered pair to JSONL."""
 
@@ -287,6 +296,7 @@ class EvaluationRunner:
                 generation_kwargs=dict(generation_kwargs or {}),
                 metrics=dict(metrics or {}),
                 batch_size=batch_size,
+                result_metadata=result_metadata,
             ):
                 handle.write(json.dumps(result.to_dict(), ensure_ascii=False) + "\n")
                 handle.flush()

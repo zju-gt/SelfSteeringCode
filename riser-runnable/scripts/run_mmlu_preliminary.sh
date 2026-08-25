@@ -23,6 +23,7 @@ BATCH_SIZE="${BATCH_SIZE:-1}"
 FIXED_PRIMITIVES_RAW="${FIXED_PRIMITIVES_RAW:-0}"
 FIXED_STRENGTHS_RAW="${FIXED_STRENGTHS_RAW:-1.0}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
+RESULTS_OUTPUT="${RESULTS_OUTPUT:-}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -70,7 +71,9 @@ VECTORS_OUTPUT="${OUTPUT_DIR}/vectors.pt"
 LIBRARY_OUTPUT="${OUTPUT_DIR}/primitives.pt"
 METADATA_OUTPUT="${OUTPUT_DIR}/primitives.json"
 EVALUATION_INPUT="${OUTPUT_DIR}/evaluation.jsonl"
-RESULTS_OUTPUT="${OUTPUT_DIR}/results.jsonl"
+if [[ -z "${RESULTS_OUTPUT}" ]]; then
+    RESULTS_OUTPUT="${OUTPUT_DIR}/results_$(date +%y%m%d_%H%M).jsonl"
+fi
 
 # echo "[1/3] Collecting MMLU prompt pairs and activation vectors..."
 # "${PYTHON_BIN}" examples/collect_mmlu_math_vectors.py \

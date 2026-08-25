@@ -201,6 +201,30 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(results[2].routing["selected_primitives"], [0])
         self.assertEqual(tokenizer.padding_side, "left")
 
+    def test_runner_merges_run_metadata_into_each_result(self):
+        runner = EvaluationRunner(
+            baseline_model=TinyModel([9, 10]),
+            steered_model=TinySteeredModel([9, 11]),
+            tokenizer=TinyTokenizer(),
+        )
+
+        result = runner.run(
+            [EvaluationExample("q1", "Question", metadata={"subject": "math"})],
+            result_metadata={
+                "batch_size": 2,
+                "max_new_tokens": 2048,
+                "layer": 20,
+                "primitive": [0],
+                "strength": [1.0],
+                "generated_at": "2025-08-25T08:15:00",
+            },
+        )[0]
+
+        self.assertEqual(result.metadata["subject"], "math")
+        self.assertEqual(result.metadata["batch_size"], 2)
+        self.assertEqual(result.metadata["max_new_tokens"], 2048)
+        self.assertEqual(result.metadata["generated_at"], "2025-08-25T08:15:00")
+
 
 if __name__ == "__main__":
     unittest.main()

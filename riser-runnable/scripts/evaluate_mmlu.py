@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 import sys
 
@@ -14,6 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from riser.evaluation.cli import load_examples
 from riser.evaluation.metrics import exact_match, substring_match
+from riser.evaluation.paths import resolve_results_path
 from riser.evaluation.runner import EvaluationRunner
 from riser.inference import SteeredModel
 from riser.router import RouterInference
@@ -31,7 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--library", required=True, help="Primitive library .pt path")
     parser.add_argument("--layer", required=True, type=int, help="Injection layer")
     parser.add_argument("--input", required=True, help="MMLU evaluation JSONL")
-    parser.add_argument("--output", required=True, help="Results JSONL")
+    parser.add_argument("--output", help="Results JSONL; defaults to a timestamped path")
+    parser.add_argument(
+        "--output-dir",
+        default="artifacts/mmlu_preliminary",
+        help="Directory for the default timestamped results file",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument(
         "--batch-size",
@@ -79,6 +86,7 @@ def _validate_args(args: argparse.Namespace) -> None:
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     _validate_args(args)
+    output_path = resolve_results_path(args.output, args.output_dir)
     dtype = getattr(torch, args.dtype)
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -115,7 +123,7 @@ def main(argv=None) -> int:
     )
     result_count = runner.run_to_jsonl(
         load_examples(args.input),
-        args.output,
+        output_path,
         generation_kwargs={
             "max_new_tokens": args.max_new_tokens,
             "do_sample": False,
@@ -127,8 +135,16 @@ def main(argv=None) -> int:
             "substring_match": substring_match,
         },
         batch_size=args.batch_size,
+        result_metadata={
+            "batch_size": args.batch_size,
+            "max_new_tokens": args.max_new_tokens,
+            "layer": args.layer,
+            "primitive": args.fixed_primitives or [],
+            "strength": args.fixed_strengths or [],
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+        },
     )
-    print(f"Wrote {result_count} MMLU evaluation results to {args.output}")
+    print(f"Wrote {result_count} MMLU evaluation results to {output_path}")
     return 0
 
 
