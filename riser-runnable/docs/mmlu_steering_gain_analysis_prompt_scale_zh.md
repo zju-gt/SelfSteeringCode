@@ -1,15 +1,42 @@
 # Steering 提升不明显的两个原因
 
-## 1. Baseline 已经被 positive prompt 激活了 reasoning
+## 1. 评测 baseline 不应使用向量提取的 positive prompt
 
-向量提取时，positive prompt 要求模型“仔细推理并解释过程”，negative prompt 才要求“只回答案”。但评测阶段在 `scripts/prepare_mmlu_eval.py` 中只使用 `positive_prompt`，因此实际比较的是：
+当前实现中，`scripts/prepare_mmlu_eval.py` 会把向量提取阶段的 `positive_prompt` 直接作为评测输入，因此实际比较的是：
 
 ```text
 positive prompt
 positive prompt + steering vector
 ```
 
-Baseline 本身已经处于 reasoning 状态，steering vector 的边际作用很小，所以文本可能发生变化，但最终答案准确率提升不明显。
+这会让 baseline 预先获得“仔细推理、检查计算、解释过程”等显式 reasoning 指令，削弱 activation steering 的边际收益。需要区分两个阶段：
+
+- 向量提取：使用 RISER 的 positive/negative prompt，构造对比激活差异；
+- 下游评测：不使用上述 reasoning 指令，采用 neutral zero-shot prompt，让 baseline 和 steered 模型接收完全相同的原始题目。
+
+RISER 论文将 Base Model 定义为 zero-shot/standard inference，并将 CoT 作为单独的 baseline；因此评测应改为：
+
+```text
+neutral zero-shot prompt
+neutral zero-shot prompt + steering vector
+```
+
+建议的 MMLU neutral prompt 只保留题目、选项和答案位置，不加入“仔细推理”“展示过程”等指令：
+
+```text
+Question:
+{{QUESTION}}
+
+Choices:
+A. {{CHOICE_A}}
+B. {{CHOICE_B}}
+C. {{CHOICE_C}}
+D. {{CHOICE_D}}
+
+Answer:
+```
+
+如果需要衡量显式 prompting 的影响，应另行增加 `CoT` 与 `CoT + steering` 两组，不能把 positive prompt 当作 RISER 风格的 baseline。
 
 ## 2. 当前注入强度相对 hidden state 偏小
 
