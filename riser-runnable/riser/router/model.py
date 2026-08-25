@@ -17,7 +17,7 @@ class RouterConfig:
     num_primitives: int
     bottleneck_dim: int = 1024
     selection_threshold: float = 0.7
-    max_strength: float = 2.0
+    max_strength: float = 10.0
     strength_temperature: float = 1.0
 
     def __post_init__(self) -> None:
