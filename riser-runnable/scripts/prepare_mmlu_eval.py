@@ -73,16 +73,12 @@ def build_neutral_prompt(question: str, choices: Sequence[Any]) -> str:
         for index, choice in enumerate(choices)
     )
     return (
-        "Solve the following multiple-choice problem carefully. "
-        "First show concise step-by-step reasoning, including the key "
-        "calculation or logical argument. Do not skip verification.\n\n"
+        "Solve the multiple-choice question carefully. "
         f"Question:\n{question.strip()}\n\n"
         f"Choices:\n{choice_lines}\n\n"
-        "Response requirements:\n"
-        "1. First write concise step-by-step reasoning.\n"
-        "2. Then end your response with exactly one line in this format: "
-        "Final answer: A (replace A with B, C, or D as appropriate).\n\n"
-        "Reasoning:\n"
+        "Requirements:\n"
+        "1. Give step-by-step reasoning.\n"
+        "2. End with exactly one line in the format: Final answer: X, where X is one of A, B, C, or D.\n"
     )
 
 
