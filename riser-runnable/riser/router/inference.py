@@ -98,7 +98,7 @@ class RouterInference:
         device: str = "cuda",
         fixed_primitives: Optional[Sequence[int]] = None,
         fixed_strengths: Optional[Sequence[float]] = None,
-        fixed_max_strength: float = 2.0,
+        fixed_max_strength: float = 10.0,
     ) -> "RouterInference":
         primitive_library = cls._load_primitive_library(primitive_library_path)
 
@@ -157,7 +157,7 @@ class RouterInference:
         device: str = "cuda",
         fixed_primitives: Optional[Sequence[int]] = None,
         fixed_strengths: Optional[Sequence[float]] = None,
-        fixed_max_strength: float = 2.0,
+        fixed_max_strength: float = 10.0,
     ) -> "RouterInference":
         """Create deterministic routing from primitive IDs and strengths.
 
@@ -209,7 +209,7 @@ class RouterInference:
         device: str = "cuda",
         fixed_primitives: Optional[Sequence[int]] = None,
         fixed_strengths: Optional[Sequence[float]] = None,
-        fixed_max_strength: float = 2.0,
+        fixed_max_strength: float = 10.0,
     ) -> "RouterInference":
         """Create deterministic routing directly from a saved library."""
         return cls.from_fixed_library(
