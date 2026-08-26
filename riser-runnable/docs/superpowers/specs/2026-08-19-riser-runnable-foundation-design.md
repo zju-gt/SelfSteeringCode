@@ -21,7 +21,7 @@ prompt pairs
   -> EvaluationRunner
 ```
 
-The Router uses the RISER paper architecture: a shared `d -> 1024 -> 1024` SiLU MLP, a sigmoid selection head with a configurable hard threshold (default `0.7`), and a bounded strength head with maximum strength `2.0`. It supports both `[d]` and `[batch, d]` hidden-state inputs and composes vectors as `sum(mask_i * strength_i * primitive_i)`.
+The Router uses the RISER paper architecture: a shared `d -> 1024 -> 1024` SiLU MLP, a sigmoid selection head with a configurable hard threshold (default `0.7`), and a bounded strength head with maximum strength `10.0` by default. It supports both `[d]` and `[batch, d]` hidden-state inputs and composes vectors as `sum(mask_i * strength_i * primitive_i)`.
 
 The steered model registers the existing target-layer hook for generation, computes and caches the route during the first applicable forward pass by default, reuses the same injection during decoding, and always removes the hook in a `finally` path. A refresh option remains available for experiments that need per-forward routing.
 

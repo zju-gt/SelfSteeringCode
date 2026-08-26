@@ -54,6 +54,7 @@ MAX_NEW_TOKENS="2048"
 BATCH_SIZE="1"
 FIXED_PRIMITIVES_RAW="0"
 FIXED_STRENGTHS_RAW="1.0"
+FIXED_MAX_STRENGTH="10.0"
 ```
 
 ### 必须确认的配置
@@ -68,7 +69,7 @@ FIXED_STRENGTHS_RAW="1.0"
 - `MAX_NEW_TOKENS`：每次生成允许的最大新 token 数，默认 `2048`。数学题需要先进行 reasoning 再输出选项，设置过小可能在最终答案前截断。仍可通过环境变量临时覆盖，例如 `MAX_NEW_TOKENS=512 bash scripts/run_mmlu_preliminary.sh`。
 - `BATCH_SIZE`：每次使用 Transformers 并行生成的样本数。显存不足时调小，例如 `BATCH_SIZE=2 bash scripts/run_mmlu_preliminary.sh`；单样本回归可设为 `1`。
 - `FIXED_PRIMITIVES_RAW`：要注入的 primitive 行号，例如 `0 2`。
-- `FIXED_STRENGTHS_RAW`：对应的 strength，例如 `0.5 1.0`。两个列表长度必须相同，最大 strength 默认不超过 `2.0`。
+- `FIXED_STRENGTHS_RAW`：对应的 strength，例如 `0.5 1.0`。两个列表长度必须相同，最大 strength 默认不超过 `10.0`；也可用 `FIXED_MAX_STRENGTH` 调整上限。
 
 默认数据集配置是：
 
@@ -169,6 +170,9 @@ FIXED_PRIMITIVES_RAW="0" FIXED_STRENGTHS_RAW="1.0" \
 
 FIXED_PRIMITIVES_RAW="0" FIXED_STRENGTHS_RAW="2.0" \
   OUTPUT_DIR=artifacts/mmlu_p0_s20 bash scripts/run_mmlu_preliminary.sh
+
+FIXED_PRIMITIVES_RAW="0" FIXED_STRENGTHS_RAW="10.0" \
+  OUTPUT_DIR=artifacts/mmlu_p0_s100 bash scripts/run_mmlu_preliminary.sh
 ```
 
 多个 primitive 可以组合：
@@ -183,8 +187,8 @@ bash scripts/run_mmlu_preliminary.sh
 
 ```text
 baseline
-primitive 0, strength 0.5 / 1.0 / 2.0
-primitive 1, strength 0.5 / 1.0 / 2.0
+primitive 0, strength 0.5 / 1.0 / 2.0 / 5.0 / 10.0
+primitive 1, strength 0.5 / 1.0 / 2.0 / 5.0 / 10.0
 ...
 random 或打乱后的 vector（后续可补充）
 ```

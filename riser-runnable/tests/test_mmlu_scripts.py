@@ -135,6 +135,7 @@ class MMLUEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(args.max_new_tokens, 2048)
         self.assertEqual(args.batch_size, 1)
+        self.assertEqual(args.fixed_max_strength, 10.0)
 
     def test_parser_accepts_batch_size(self):
         args = build_evaluator_parser().parse_args(

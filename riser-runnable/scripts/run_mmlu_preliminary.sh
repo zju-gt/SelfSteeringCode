@@ -22,6 +22,7 @@ MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-2048}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 FIXED_PRIMITIVES_RAW="${FIXED_PRIMITIVES_RAW:-0}"
 FIXED_STRENGTHS_RAW="${FIXED_STRENGTHS_RAW:-10.0}"
+FIXED_MAX_STRENGTH="${FIXED_MAX_STRENGTH:-10.0}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 RESULTS_OUTPUT="${RESULTS_OUTPUT:-}"
 NO_PROGRESS="${NO_PROGRESS:-0}"
@@ -139,6 +140,7 @@ echo "[3/3] Running baseline versus fixed-vector steering evaluation..."
     --dtype "${DTYPE}" \
     --fixed-primitives "${FIXED_PRIMITIVES[@]}" \
     --fixed-strengths "${FIXED_STRENGTHS[@]}" \
+    --fixed-max-strength "${FIXED_MAX_STRENGTH}" \
     "${EVAL_PROGRESS_ARGS[@]}"
 
 echo "实验完成，输出文件："

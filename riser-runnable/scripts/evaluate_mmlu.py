@@ -65,7 +65,12 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="+",
         help="Strength for each fixed primitive; defaults to 1.0",
     )
-    parser.add_argument("--fixed-max-strength", type=float, default=2.0)
+    parser.add_argument(
+        "--fixed-max-strength",
+        type=float,
+        default=10.0,
+        help="Maximum allowed fixed intervention strength (default: 10.0)",
+    )
     parser.add_argument("--no-cache-routing", action="store_true")
     parser.add_argument(
         "--no-progress",

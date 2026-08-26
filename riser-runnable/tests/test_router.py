@@ -27,7 +27,7 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(logits.shape, (2, 3))
         self.assertEqual(features.shape, (2, 8))
         self.assertTrue(torch.all(strength >= 0).item())
-        self.assertTrue(torch.all(strength <= 2).item())
+        self.assertTrue(torch.all(strength <= 10).item())
 
         vector_outputs = router(torch.zeros(4), hard=True)
         self.assertEqual(vector_outputs[0].shape, (1, 3))
@@ -57,7 +57,9 @@ class RouterTests(unittest.TestCase):
             router.selection_head.weight.zero_()
             router.selection_head.bias.copy_(torch.tensor([6.0, -6.0, 6.0]))
             router.strength_head.weight.zero_()
-            router.strength_head.bias.zero_()
+            # The default max strength is now 10.0; choose a sigmoid value of
+            # 0.1 here so the composed strength remains exactly 1.0.
+            router.strength_head.bias.fill_(math.log(0.1 / 0.9))
 
         primitives = torch.tensor(
             [
@@ -107,6 +109,20 @@ class RouterTests(unittest.TestCase):
         )
         self.assertEqual(info["selected_primitives"], [[0, 2], [0, 2]])
         self.assertEqual(info["selected_strengths"], [[0.5, 1.5], [0.5, 1.5]])
+
+    def test_fixed_router_accepts_strength_ten(self):
+        routing = RouterInference.from_fixed_library(
+            primitive_library=torch.tensor([[1.0, 0.0, 0.0]]),
+            target_layer=0,
+            device="cpu",
+            fixed_primitives=[0],
+            fixed_strengths=[10.0],
+        )
+
+        injected, info = routing.inject_activation(torch.zeros(1, 3))
+
+        torch.testing.assert_close(injected, torch.tensor([[10.0, 0.0, 0.0]]))
+        self.assertEqual(info["selected_strengths"], [[10.0]])
 
     def test_fixed_router_allows_empty_route(self):
         routing = RouterInference.from_fixed_library(

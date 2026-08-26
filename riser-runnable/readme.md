@@ -144,7 +144,7 @@ When `--router` is omitted, the route is deterministic and independent of
 the hidden state.  If no fixed primitives are supplied, the model runs with
 an empty route, which is useful as a no-injection control.  Fixed primitive
 IDs refer to the row positions in the saved library and fixed strengths are
-bounded by `--fixed-max-strength` (default `2.0`).
+bounded by `--fixed-max-strength` (default `10.0`).
 
 Run the initial baseline-versus-steered evaluator:
 
