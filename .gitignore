@@ -5,3 +5,4 @@
 venv/
 *.egg-info/
 .worktrees/
+riser-runnable/artifacts/mmlu_preliminary/data_old

@@ -4,7 +4,7 @@ set -euo pipefail
 
 # User-editable defaults. Environment variables override these values.
 PYTHON_BIN="${PYTHON_BIN:-python}"
-RESULTS_FILE="${RESULTS_FILE:-artifacts/mmlu_preliminary/results_260825_1718.jsonl}"
+RESULTS_FILE="${RESULTS_FILE:-artifacts/mmlu_preliminary/results_260826_0709.jsonl}"
 METRICS_RAW="${METRICS_RAW:-mmlu_accuracy exact_match substring_match}"
 
 if [[ "$#" -gt 1 ]]; then

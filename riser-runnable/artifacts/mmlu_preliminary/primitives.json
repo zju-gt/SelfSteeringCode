@@ -1,29 +1,23 @@
 {
-  "num_primitives": 6,
+  "num_primitives": 3,
   "hidden_dim": 3584,
   "primitive_names": [
     "mmlu_math_cluster_0",
     "mmlu_math_cluster_1",
-    "mmlu_math_cluster_2",
-    "mmlu_math_cluster_3",
-    "mmlu_math_cluster_4",
-    "mmlu_math_cluster_5"
+    "mmlu_math_cluster_2"
   ],
   "source": "MMLU mathematics subjects",
   "dataset_name": "cais/mmlu",
   "split": "test",
   "subjects": [
-    "abstract_algebra",
-    "college_mathematics",
-    "elementary_mathematics",
-    "high_school_mathematics"
+    "college_mathematics"
   ],
   "model": "/sda/llm_weights/Qwen2.5-7B-Instruct",
   "target_layers": [
     20
   ],
   "layer_aggregation": "last",
-  "num_pairs": 500,
+  "num_pairs": 100,
   "positive_behavior": "proof-level rigorous reasoning",
   "negative_behavior": "plausible but unverified response",
   "prompt_format": "chat_template:user+generation_prompt:contrastive_riser_prompts"
