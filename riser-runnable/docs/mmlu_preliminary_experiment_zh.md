@@ -211,3 +211,28 @@ python scripts/prepare_mmlu_eval.py \
 ```bash
 python scripts/evaluate_mmlu.py --help
 ```
+
+## 8. 分析已有结果
+
+可以直接传入结果 JSONL，打印 baseline、steered 及配对结果：
+
+```bash
+bash scripts/analyze_results.sh artifacts/mmlu_preliminary/results_260825_1718.jsonl
+```
+
+不传路径时，脚本使用顶部的默认配置（当前 `RESULTS_FILE` 指向 `results_260825_1718.jsonl`，`METRICS_RAW` 默认包含三个已记录指标）。可以直接编辑 `RESULTS_FILE`、`METRICS_RAW` 和 `PYTHON_BIN`，也可以用环境变量覆盖，例如：
+
+```bash
+RESULTS_FILE=artifacts/mmlu_preliminary/results_260825_1718.jsonl \
+METRICS_RAW="mmlu_accuracy" \
+bash scripts/analyze_results.sh
+```
+
+也可以直接调用 Python 脚本：
+
+```bash
+python scripts/analyze_results.py \
+  --input artifacts/mmlu_preliminary/results_260825_1718.jsonl
+```
+
+默认会打印所有结果指标和分科 `mmlu_accuracy`；使用 `--metric mmlu_accuracy` 可以只查看指定指标。
