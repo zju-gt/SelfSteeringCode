@@ -24,7 +24,7 @@ Out of scope:
 
 ## Identity and resume behavior
 
-Generation rows will carry an `item_identity` derived from dataset, item id, prompt, gold answer, answer type, choices, and demand memberships. A generation key is `(run_id, item_identity, steering_capability, alpha)`. Pending rows and persisted rows are created through the same helper so the identity cannot diverge.
+Generation rows will carry an `item_identity` derived from dataset, item id, the fully rendered prompt (including choices), gold answer, answer type, and demand memberships. A generation key is `(run_id, item_identity, steering_capability, alpha)`. Pending rows and persisted rows are created through the same helper so the identity cannot diverge.
 
 When an output file already contains duplicate keys, the latest successful row is canonical. Resume skips that key, and scoring consumes only canonical successful rows. This repairs existing polluted files without rewriting or deleting them.
 

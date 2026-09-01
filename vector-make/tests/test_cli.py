@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,12 +17,22 @@ SCRIPTS = [
 ]
 
 
+def subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    source = str(ROOT / "src")
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (source, env.get("PYTHONPATH", "")) if part
+    )
+    return env
+
+
 def test_every_cli_provides_help_without_loading_model() -> None:
     for name in SCRIPTS:
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / name), "--help"],
             capture_output=True,
             text=True,
+            env=subprocess_env(),
         )
         assert result.returncode == 0, f"{name}: {result.stderr}"
         assert "--config" in result.stdout
@@ -55,6 +66,7 @@ def test_prepare_data_cli_runs_with_local_fixtures(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         cwd=ROOT,
+        env=subprocess_env(),
     )
     assert result.returncode == 0, result.stderr
     rows = (

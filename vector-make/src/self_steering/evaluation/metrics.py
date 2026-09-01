@@ -59,13 +59,20 @@ def paired_alpha_rows(
         raise ValueError("expected_alphas must include the alpha-zero baseline")
     observed: dict[tuple[str, str], set[float]] = defaultdict(set)
     for row in materialized:
-        identity = (str(row["dataset"]), str(row["item_id"]))
+        identity = (
+            str(row["dataset"]),
+            str(row.get("item_identity", row["item_id"])),
+        )
         observed[identity].add(float(row["alpha"]))
     complete = {identity for identity, alphas in observed.items() if required <= alphas}
     return [
         row
         for row in materialized
-        if (str(row["dataset"]), str(row["item_id"])) in complete
+        if (
+            str(row["dataset"]),
+            str(row.get("item_identity", row["item_id"])),
+        )
+        in complete
         and float(row["alpha"]) in required
     ]
 
@@ -107,6 +114,63 @@ def specificity_matrix(
                 baseline_values
             ) / len(baseline_values)
     return matrix
+
+
+def specificity_report(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    alpha: float,
+    capabilities: Sequence[str],
+) -> dict[str, Any]:
+    """Return a full specificity matrix and make missing coverage explicit."""
+
+    names = list(capabilities)
+    if not names or len(names) != len(set(names)):
+        raise ValueError("capabilities must be a non-empty unique sequence")
+    materialized = list(rows)
+    cells: dict[tuple[str, str, float], list[bool]] = defaultdict(list)
+    for row in materialized:
+        steering = str(row["steering_capability"])
+        row_alpha = float(row["alpha"])
+        for demand in _high_demand_capabilities(row):
+            cells[(steering, demand, row_alpha)].append(bool(row["correct"]))
+
+    matrix: dict[str, dict[str, float | None]] = {}
+    counts: dict[str, dict[str, int]] = {}
+    missing_cells: list[list[str]] = []
+    for steering in names:
+        matrix[steering] = {}
+        counts[steering] = {}
+        for demand in names:
+            baseline = cells.get((steering, demand, 0.0), [])
+            steered = cells.get((steering, demand, float(alpha)), [])
+            count = min(len(baseline), len(steered))
+            counts[steering][demand] = count
+            if count == 0:
+                matrix[steering][demand] = None
+                missing_cells.append([steering, demand])
+                continue
+            matrix[steering][demand] = sum(steered) / len(steered) - sum(
+                baseline
+            ) / len(baseline)
+
+    dominance = None
+    if not missing_cells:
+        complete_matrix = {
+            steering: {
+                demand: float(value)
+                for demand, value in row.items()
+                if value is not None
+            }
+            for steering, row in matrix.items()
+        }
+        dominance = diagonal_dominance(complete_matrix)
+    return {
+        "matrix": matrix,
+        "counts": counts,
+        "missing_cells": missing_cells,
+        "diagonal_dominance": dominance,
+    }
 
 
 def diagonal_dominance(matrix: Mapping[str, Mapping[str, float]]) -> float:

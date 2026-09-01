@@ -1,6 +1,6 @@
 model:
   name: Qwen/Qwen2.5-7B-Instruct
-  revision: main
+  revision: a09a35458c702b33eeacc393d103063234e8bc28
   cache_dir: null
   num_hidden_layers: 28
   dtype: bfloat16

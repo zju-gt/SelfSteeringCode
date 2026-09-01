@@ -131,6 +131,11 @@ def test_offline_pipeline_from_registry_to_metrics(tmp_path: Path) -> None:
     assert extract_vectors(config).exists()
     assert all(path.exists() for path in analyze_similarity(config).values())
     generations = run_steering(config, model, tokenizer)
-    assert len(list(read_jsonl(generations))) == 4
+    generation_rows = list(read_jsonl(generations))
+    assert len(generation_rows) == 4
+    assert all(row["run_id"] for row in generation_rows)
+    assert all(row["capture_artifact_id"] for row in generation_rows)
+    assert all(len(row["vector_sha256"]) == 64 for row in generation_rows)
+    assert all(row["generation_parameters"]["max_new_tokens"] == 1 for row in generation_rows)
     metrics = score_generations(config)
     assert all(path.exists() for path in metrics.values())

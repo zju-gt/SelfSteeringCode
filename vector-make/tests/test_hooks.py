@@ -64,3 +64,22 @@ def test_intervention_rejects_hidden_size_mismatch() -> None:
     with add_steering_vector(block, torch.tensor([1.0, 2.0, 3.0]), alpha=1.0):
         with pytest.raises(ValueError, match="hidden size"):
             block(torch.zeros(1, 1, 2))
+
+
+def test_intervention_converts_vector_once_per_device_and_dtype(monkeypatch) -> None:
+    block = TensorBlock()
+    vector = torch.tensor([2.0, 3.0])
+    original_to = torch.Tensor.to
+    calls = 0
+
+    def tracking_to(tensor, *args, **kwargs):
+        nonlocal calls
+        if tensor.data_ptr() == vector.data_ptr():
+            calls += 1
+        return original_to(tensor, *args, **kwargs)
+
+    monkeypatch.setattr(torch.Tensor, "to", tracking_to)
+    with add_steering_vector(block, vector, alpha=1.0):
+        block(torch.zeros(1, 1, 2))
+        block(torch.zeros(1, 1, 2))
+    assert calls == 1

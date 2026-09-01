@@ -6,6 +6,7 @@ from self_steering.evaluation.metrics import (
     diagonal_dominance,
     paired_alpha_rows,
     specificity_matrix,
+    specificity_report,
 )
 
 
@@ -42,6 +43,63 @@ def test_diagonal_dominance_subtracts_off_diagonal_mean() -> None:
     assert diagonal_dominance(matrix) == pytest.approx(0.75)
 
 
+def test_specificity_report_marks_sparse_matrix_incomplete() -> None:
+    rows = [
+        {
+            "steering_capability": "QLl",
+            "demand_capability": "QLl",
+            "alpha": 0.0,
+            "correct": False,
+        },
+        {
+            "steering_capability": "QLl",
+            "demand_capability": "QLl",
+            "alpha": 1.0,
+            "correct": True,
+        },
+    ]
+    report = specificity_report(rows, alpha=1.0, capabilities=["QLl", "QLq"])
+    assert report["matrix"]["QLl"]["QLl"] == 1.0
+    assert report["matrix"]["QLl"]["QLq"] is None
+    assert report["counts"]["QLl"]["QLl"] == 1
+    assert report["counts"]["QLq"]["QLq"] == 0
+    assert report["missing_cells"] == [
+        ["QLl", "QLq"],
+        ["QLq", "QLl"],
+        ["QLq", "QLq"],
+    ]
+    assert report["diagonal_dominance"] is None
+
+
+def test_specificity_report_computes_dominance_only_when_complete() -> None:
+    rows = []
+    for steering, demand, delta in (
+        ("a", "a", 1),
+        ("a", "b", 0),
+        ("b", "a", 0),
+        ("b", "b", 1),
+    ):
+        rows.extend(
+            [
+                {
+                    "steering_capability": steering,
+                    "demand_capability": demand,
+                    "alpha": 0.0,
+                    "correct": False,
+                },
+                {
+                    "steering_capability": steering,
+                    "demand_capability": demand,
+                    "alpha": 1.0,
+                    "correct": bool(delta),
+                },
+            ]
+        )
+    report = specificity_report(rows, alpha=1.0, capabilities=["a", "b"])
+    assert report["missing_cells"] == []
+    assert report["diagonal_dominance"] == pytest.approx(1.0)
+
+
 def test_accuracy_by_demand_slice_separates_high_and_low() -> None:
     rows = [
         {"alpha": 0.0, "correct": False, "demand_memberships": {"QLl": "high"}},
@@ -61,3 +119,21 @@ def test_paired_alpha_rows_excludes_incomplete_items() -> None:
     ]
     paired = paired_alpha_rows(rows, [0.0, 1.0])
     assert {row["item_id"] for row in paired} == {"complete"}
+
+
+def test_paired_alpha_rows_uses_content_identity_when_available() -> None:
+    rows = [
+        {
+            "dataset": "d",
+            "item_id": "same-id",
+            "item_identity": "old-content",
+            "alpha": 0.0,
+        },
+        {
+            "dataset": "d",
+            "item_id": "same-id",
+            "item_identity": "new-content",
+            "alpha": 1.0,
+        },
+    ]
+    assert paired_alpha_rows(rows, [0.0, 1.0]) == []

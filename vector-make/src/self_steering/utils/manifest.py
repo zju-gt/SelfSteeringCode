@@ -15,6 +15,9 @@ def build_manifest(
     dataset_fingerprints: dict[str, str | None] | None = None,
     rubric_hashes: dict[str, str] | None = None,
     prompt_hashes: dict[str, str] | None = None,
+    artifact_hashes: dict[str, str] | None = None,
+    model_resolution: dict[str, str | None] | None = None,
+    seed: int | None = None,
     packages: Iterable[str] = ("torch", "transformers", "datasets", "openai"),
 ) -> dict[str, Any]:
     versions: dict[str, str | None] = {}
@@ -32,4 +35,7 @@ def build_manifest(
         "dataset_fingerprints": dataset_fingerprints or {},
         "rubric_hashes": rubric_hashes or {},
         "prompt_hashes": prompt_hashes or {},
+        "artifact_hashes": artifact_hashes or {},
+        "model_resolution": model_resolution or {},
+        "seed": seed,
     }

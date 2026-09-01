@@ -5,8 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from self_steering.datasets.delean_labeler import (
+    ANNOTATION_SCHEMA,
     AnnotationRequest,
     annotation_key,
+    build_annotation_prompt,
+    expected_annotation_key,
     label_one_dimension,
     retry_call,
 )
@@ -52,6 +55,8 @@ def test_label_one_dimension_returns_hashed_audit_record(tmp_path: Path) -> None
     assert row["annotator_model_returned"] == "judge-returned"
     assert len(row["task_sha256"]) == 64
     assert len(row["rubric_sha256"]) == 64
+    assert len(row["annotation_prompt_sha256"]) == 64
+    assert len(row["annotation_schema_sha256"]) == 64
     assert responses.kwargs["text"]["format"]["strict"] is True
 
 
@@ -62,11 +67,29 @@ def test_annotation_key_changes_when_task_hash_changes() -> None:
         "task_sha256": "old",
         "rubric_sha256": "r",
         "annotator_model_requested": "m",
+        "annotation_contract_sha256": "contract",
         "status": "ok",
     }
     new = dict(old, task_sha256="new")
     assert annotation_key(old) != annotation_key(new)
     assert annotation_key(new) not in completed_annotation_keys([old])
+
+
+def test_expected_annotation_key_hashes_rendered_prompt_and_schema() -> None:
+    request = AnnotationRequest("i1", "mmlu", "test", "Q", "QLl")
+    key = expected_annotation_key(request, "rubric", "judge")
+    expected_contract = json.dumps(
+        {
+            "prompt": build_annotation_prompt(request, "rubric"),
+            "schema": ANNOTATION_SCHEMA,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    from self_steering.utils.io import sha256_text
+
+    assert key[-1] == sha256_text(expected_contract)
 
 
 def test_current_annotation_rows_excludes_stale_success() -> None:
@@ -76,6 +99,7 @@ def test_current_annotation_rows_excludes_stale_success() -> None:
         "task_sha256": "old",
         "rubric_sha256": "r",
         "annotator_model_requested": "m",
+        "annotation_contract_sha256": "old-contract",
         "status": "ok",
     }
     current = dict(old, task_sha256="new", level=4)
@@ -92,11 +116,12 @@ def test_score_items_does_not_reuse_stale_hash(tmp_path: Path) -> None:
         "task_sha256": "old",
         "rubric_sha256": "r",
         "annotator_model_requested": "m",
+        "annotation_contract_sha256": "old-contract",
         "status": "ok",
     }
     output.write_text(json.dumps(old) + "\n", encoding="utf-8")
     item = CanonicalItem("i1", "mmlu", "test", "new task", "A", "choice", {"A": "x"})
-    expected = ("i1", "QLl", "new", "r", "m")
+    expected = ("i1", "QLl", "new", "r", "m", "new-contract")
     calls = []
 
     def label_fn(current, dimension):
@@ -104,6 +129,7 @@ def test_score_items_does_not_reuse_stale_hash(tmp_path: Path) -> None:
         return dict(
             old,
             task_sha256="new",
+            annotation_contract_sha256="new-contract",
             level=4,
             brief_justification="ok",
         )

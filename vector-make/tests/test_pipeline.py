@@ -1,16 +1,26 @@
+import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import torch
+from torch import nn
 
 from self_steering.datasets.registry import DatasetRegistry
 from self_steering.datasets.types import CanonicalItem
 from self_steering.pipeline import (
+    canonical_generation_rows,
+    capture_contrasts,
     capture_artifact_id,
+    generation_identity_record,
     generation_key,
     prepare_data,
     prepare_items,
+    run_steering,
     score_demands,
     steering_artifact_id,
 )
-from self_steering.utils.io import read_jsonl, write_jsonl
+from self_steering.utils.io import read_jsonl, sha256_file, write_jsonl
+from self_steering.vectors.storage import save_vector_library
 
 
 def base_config(tmp_path: Path) -> dict:
@@ -52,6 +62,15 @@ def test_prepare_data_writes_mmlu_and_enabled_steering_dataset(tmp_path: Path) -
     paths = prepare_data(base_config(tmp_path), registry)
     assert set(paths) == {"mmlu", "math500"}
     assert list(read_jsonl(paths["mmlu"]))[0]["item_id"] == "m1"
+    manifest = json.loads(
+        (tmp_path / "outputs" / "manifests" / "00_prepare_data.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["dataset_fingerprints"]["mmlu"] == sha256_file(paths["mmlu"])
+    assert manifest["seed"] == 42
+    assert set(manifest["prompt_hashes"]) == {"capability_prompts", "generic_prompt"}
+    assert (tmp_path / "outputs" / "manifests" / "00_prepare_data").is_dir()
 
 
 def test_prepare_items_writes_extraction_and_external_memberships(
@@ -120,6 +139,57 @@ def test_generation_key_changes_with_task_content() -> None:
     )
 
 
+def test_generation_identity_record_matches_persisted_row_key() -> None:
+    item = CanonicalItem("x", "math500", "test", "q", "1", "math")
+    source = {"demand_memberships": {"QLl": "high"}}
+    pending = generation_identity_record(
+        run_id="run-1",
+        dataset="math500",
+        item=item,
+        source_row=source,
+        steering_capability="QLl",
+        alpha=1.0,
+    )
+    persisted = dict(pending, raw_output="1", status="ok")
+    assert pending["demand_memberships"] == {"QLl": "high"}
+    assert generation_key(pending) == generation_key(persisted)
+
+
+def test_canonical_generation_rows_keep_latest_success_per_key() -> None:
+    identity = {
+        "run_id": "run-1",
+        "dataset": "math500",
+        "item_id": "x",
+        "item_identity": "identity-1",
+        "steering_capability": "QLl",
+        "alpha": 1.0,
+    }
+    rows = [
+        dict(identity, raw_output="old", status="ok"),
+        dict(identity, raw_output="failed", status="error"),
+        dict(identity, raw_output="new", status="ok"),
+    ]
+    assert canonical_generation_rows(rows) == [rows[-1]]
+
+
+def test_canonical_generation_rows_ignores_other_run_ids() -> None:
+    current = {
+        "run_id": "current",
+        "dataset": "math500",
+        "item_id": "x",
+        "prompt": "q",
+        "gold_answer": "1",
+        "answer_type": "math",
+        "steering_capability": "QLl",
+        "alpha": 0.0,
+        "status": "ok",
+    }
+    stale = dict(current, run_id="stale")
+    assert canonical_generation_rows([stale, current], run_id="current") == [
+        dict(current, item_identity=generation_key(current)[1])
+    ]
+
+
 def test_steering_artifact_id_changes_with_vector_content(tmp_path: Path) -> None:
     config = base_config(tmp_path)
     vector_path = (
@@ -165,3 +235,92 @@ def test_score_demands_honors_runtime_limit(tmp_path: Path) -> None:
 
     score_demands(config, label)
     assert len(calls) == 4
+
+
+class MinimalTokenizer:
+    eos_token_id = 0
+    pad_token_id = 0
+
+    def apply_chat_template(self, messages, **kwargs):
+        return [1]
+
+
+class FailingGenerationModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.embedding = nn.Embedding(4, 2)
+        self.model = SimpleNamespace(layers=[nn.Identity() for _ in range(20)])
+
+    def get_input_embeddings(self):
+        return self.embedding
+
+    def generate(self, **kwargs):
+        raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+
+def test_capture_contrasts_records_cuda_oom_per_item(tmp_path: Path, monkeypatch) -> None:
+    config = base_config(tmp_path)
+    extraction = tmp_path / "data" / "processed" / "extraction"
+    extraction.mkdir(parents=True)
+    for capability in config["experiment"]["capabilities"]:
+        write_jsonl(
+            extraction / f"{capability}.jsonl",
+            [CanonicalItem("x", "mmlu", "test", "q", "A", "choice", {"A": "x"}).to_dict()],
+        )
+    monkeypatch.setattr(
+        "self_steering.pipeline.capture_prompt_contrast",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            torch.cuda.OutOfMemoryError("CUDA out of memory")
+        ),
+    )
+    model = FailingGenerationModel()
+    assert capture_contrasts(config, model, MinimalTokenizer()) == []
+    error_path = (
+        tmp_path
+        / "outputs"
+        / "activations"
+        / capture_artifact_id(config)
+        / "errors.jsonl"
+    )
+    errors = list(read_jsonl(error_path))
+    assert len(errors) == 2
+    assert {row["error_type"] for row in errors} == {"cuda_oom"}
+    assert all("reduce" in row["hint"].lower() for row in errors)
+
+
+def test_run_steering_records_cuda_oom_for_each_generation(tmp_path: Path) -> None:
+    config = base_config(tmp_path)
+    evaluation = tmp_path / "data" / "processed" / "evaluation"
+    evaluation.mkdir(parents=True)
+    write_jsonl(
+        evaluation / "math500.jsonl",
+        [
+            dict(
+                CanonicalItem("x", "math500", "test", "q", "1", "math").to_dict(),
+                demand_memberships={"QLl": "high"},
+            )
+        ],
+    )
+    vector_root = (
+        tmp_path / "outputs" / "vectors" / capture_artifact_id(config)
+    )
+    vectors = {
+        capability: {
+            "raw": torch.ones(2),
+            "unit": torch.ones(2),
+            "steering": torch.ones(2),
+        }
+        for capability in config["experiment"]["capabilities"]
+    }
+    save_vector_library(
+        vector_root / "capability_vectors.safetensors",
+        vector_root / "capability_vectors.json",
+        vectors,
+        metadata={},
+    )
+    output = run_steering(config, FailingGenerationModel(), MinimalTokenizer())
+    rows = list(read_jsonl(output))
+    assert len(rows) == 4
+    assert {row["status"] for row in rows} == {"error"}
+    assert {row["error_type"] for row in rows} == {"cuda_oom"}
+    assert all(row["item_identity"] for row in rows)

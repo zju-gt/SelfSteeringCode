@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -19,6 +20,7 @@ SUPPORTED_DATASETS = {
     "obqa",
 }
 SUPPORTED_VECTOR_SCALINGS = {"raw", "unit", "mean_norm"}
+MVP_CAPABILITIES = {"QLl", "QLq", "CL", "MCr"}
 
 
 class ConfigError(ValueError):
@@ -100,9 +102,29 @@ def validate_config(config: dict[str, Any]) -> None:
     target_layer = experiment.get("target_layer")
     if not isinstance(num_layers, int) or num_layers <= 0:
         raise ConfigError("model.num_hidden_layers must be a positive integer")
+    revision = model.get("revision")
+    if (
+        not isinstance(revision, str)
+        or not revision.strip()
+        or revision.strip().lower() in {"main", "master"}
+    ):
+        raise ConfigError(
+            "model.revision must be pinned to an immutable commit or release tag"
+        )
     if not isinstance(target_layer, int) or not 0 <= target_layer < num_layers:
         raise ConfigError(
             f"experiment.target_layer must be in [0, {num_layers - 1}], got {target_layer!r}"
+        )
+
+    capabilities = experiment.get("capabilities")
+    if (
+        not isinstance(capabilities, list)
+        or len(capabilities) != len(MVP_CAPABILITIES)
+        or not all(isinstance(name, str) for name in capabilities)
+        or set(capabilities) != MVP_CAPABILITIES
+    ):
+        raise ConfigError(
+            "experiment.capabilities must contain each of QLl, QLq, CL, and MCr exactly once"
         )
 
     enabled = data.get("enabled_steering_datasets", [])
@@ -147,3 +169,34 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ConfigError("experiment.alphas must be a non-empty list of numbers")
     if not any(float(alpha) == 0.0 for alpha in alphas):
         raise ConfigError("experiment.alphas must include zero for the baseline")
+    normalized_alphas = [float(alpha) for alpha in alphas]
+    if not all(math.isfinite(alpha) for alpha in normalized_alphas):
+        raise ConfigError("experiment.alphas must contain only finite numbers")
+    if len(normalized_alphas) != len(set(normalized_alphas)):
+        raise ConfigError("experiment.alphas must contain unique values")
+
+    max_new_tokens = model.get("max_new_tokens", 2048)
+    if (
+        not isinstance(max_new_tokens, int)
+        or isinstance(max_new_tokens, bool)
+        or max_new_tokens <= 0
+    ):
+        raise ConfigError("model.max_new_tokens must be a positive integer")
+
+    annotation = experiment.get("annotation", {})
+    if not isinstance(annotation, dict):
+        raise ConfigError("experiment.annotation must be a mapping")
+    for name, default in (("max_workers", 1), ("max_attempts", 1)):
+        value = annotation.get(name, default)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ConfigError(f"experiment.annotation.{name} must be a positive integer")
+    backoff = annotation.get("initial_backoff_seconds", 1.0)
+    if (
+        not isinstance(backoff, (int, float))
+        or isinstance(backoff, bool)
+        or not math.isfinite(float(backoff))
+        or float(backoff) <= 0
+    ):
+        raise ConfigError(
+            "experiment.annotation.initial_backoff_seconds must be a positive finite number"
+        )

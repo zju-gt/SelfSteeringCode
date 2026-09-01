@@ -66,13 +66,24 @@ Rules:
 - Give a short justification."""
 
 
-def annotation_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+def _annotation_contract_hash(prompt: str) -> str:
+    serialized = json.dumps(
+        {"prompt": prompt, "schema": ANNOTATION_SCHEMA},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return sha256_text(serialized)
+
+
+def annotation_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str, str]:
     return (
         str(row["item_id"]),
         str(row["demand"]),
         str(row["task_sha256"]),
         str(row["rubric_sha256"]),
         str(row["annotator_model_requested"]),
+        str(row["annotation_contract_sha256"]),
     )
 
 
@@ -80,13 +91,15 @@ def expected_annotation_key(
     request: AnnotationRequest,
     rubric: str,
     model: str,
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
+    prompt = build_annotation_prompt(request, rubric)
     return (
         request.item_id,
         request.dimension,
         sha256_text(request.prompt),
         sha256_text(rubric),
         model,
+        _annotation_contract_hash(prompt),
     )
 
 
@@ -99,6 +112,12 @@ def label_one_dimension(
 ) -> dict[str, Any]:
     rubric = Path(rubric_path).read_text(encoding="utf-8")
     prompt = build_annotation_prompt(request, rubric)
+    schema_serialized = json.dumps(
+        ANNOTATION_SCHEMA,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     response = client.responses.create(
         model=model,
         input=prompt,
@@ -134,6 +153,9 @@ def label_one_dimension(
         "rubric_version": "DeLeAn-v1.0",
         "rubric_sha256": sha256_text(rubric),
         "task_sha256": sha256_text(request.prompt),
+        "annotation_prompt_sha256": sha256_text(prompt),
+        "annotation_schema_sha256": sha256_text(schema_serialized),
+        "annotation_contract_sha256": _annotation_contract_hash(prompt),
         "annotated_at": datetime.now(timezone.utc).isoformat(),
         "status": "ok",
     }

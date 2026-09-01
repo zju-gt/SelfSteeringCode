@@ -105,6 +105,43 @@ def test_multiple_choice_rejects_misaligned_labels() -> None:
         )
 
 
+def test_obqa_official_schema_uses_question_stem() -> None:
+    item = adapt_multiple_choice(
+        {
+            "id": "obqa-1",
+            "question_stem": "What conducts electricity?",
+            "choices": {
+                "label": ["A", "B", "C", "D"],
+                "text": ["rubber", "glass", "copper", "wood"],
+            },
+            "answerKey": "C",
+        },
+        dataset="obqa",
+        split="test",
+        index=0,
+    )
+    assert item.item_id == "obqa-1"
+    assert item.gold_answer == "C"
+    assert "C. copper" in item.prompt
+
+
+def test_arc_numeric_source_labels_are_mapped_to_letters() -> None:
+    item = adapt_multiple_choice(
+        {
+            "id": "arc-1",
+            "question": "Pick the second option.",
+            "choices": {"label": ["1", "2", "3", "4"], "text": ["a", "b", "c", "d"]},
+            "answerKey": "2",
+        },
+        dataset="arc_c",
+        split="test",
+        index=0,
+    )
+    assert item.choices == {"A": "a", "B": "b", "C": "c", "D": "d"}
+    assert item.gold_answer == "B"
+    assert "1." not in item.prompt
+
+
 def test_local_override_reads_canonical_jsonl() -> None:
     fixture = Path(__file__).parent / "fixtures" / "math_items.jsonl"
     registry = DatasetRegistry.default()

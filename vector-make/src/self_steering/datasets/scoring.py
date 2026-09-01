@@ -11,7 +11,7 @@ from self_steering.datasets.types import CanonicalItem
 from self_steering.utils.io import append_jsonl, read_jsonl
 
 
-AnnotationKey = tuple[str, str, str, str, str]
+AnnotationKey = tuple[str, str, str, str, str, str]
 
 
 def completed_annotation_keys(rows: Iterable[dict[str, Any]]) -> set[AnnotationKey]:

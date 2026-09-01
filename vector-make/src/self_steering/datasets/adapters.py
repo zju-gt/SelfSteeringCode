@@ -158,7 +158,7 @@ def adapt_multiple_choice(
     split: str,
     index: int,
 ) -> CanonicalItem:
-    question = str(_first_present(row, ["question", "prompt"]))
+    question = str(_first_present(row, ["question", "question_stem", "prompt"]))
     raw_choices = _first_present(row, ["choices", "options"])
     if isinstance(raw_choices, Mapping):
         labels = raw_choices.get("label")
@@ -171,14 +171,28 @@ def adapt_multiple_choice(
             raise ValueError(
                 "choices label and text lists must have equal non-zero length"
             )
-        choices = {str(label).upper(): str(text) for label, text in zip(labels, texts)}
+        if len(labels) > len(ascii_uppercase):
+            raise ValueError("too many choices to assign letter labels")
+        source_labels = [str(label).strip().upper() for label in labels]
+        if len(set(source_labels)) != len(source_labels):
+            raise ValueError("choice labels must be unique")
+        choices = {
+            ascii_uppercase[index]: str(text) for index, text in enumerate(texts)
+        }
     elif isinstance(raw_choices, (list, tuple)):
+        if not raw_choices or len(raw_choices) > len(ascii_uppercase):
+            raise ValueError("choices must be a non-empty list of at most 26 items")
+        source_labels = list(ascii_uppercase[: len(raw_choices)])
         choices = {ascii_uppercase[i]: str(text) for i, text in enumerate(raw_choices)}
     else:
         raise ValueError("choices must be a mapping or list")
-    answer = (
-        str(_first_present(row, ["answerKey", "answer", "gold_answer"])).strip().upper()
-    )
+    source_answer = str(
+        _first_present(row, ["answerKey", "answer", "gold_answer"])
+    ).strip().upper()
+    try:
+        answer = ascii_uppercase[source_labels.index(source_answer)]
+    except ValueError as exc:
+        raise ValueError("gold answer is not present in source choice labels") from exc
     item = CanonicalItem(
         item_id=str(
             row.get("item_id") or row.get("id") or f"{dataset}_{split}_{index:05d}"

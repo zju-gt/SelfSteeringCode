@@ -29,6 +29,7 @@ def add_steering_vector(
     if not math.isfinite(float(alpha)):
         raise ValueError("alpha must be finite")
     source_vector = vector.detach()
+    converted_vectors: dict[tuple[torch.device, torch.dtype], torch.Tensor] = {}
 
     def hook(module: nn.Module, inputs: tuple[Any, ...], output: Any) -> Any:
         hidden = output[0] if isinstance(output, tuple) else output
@@ -41,9 +42,13 @@ def add_steering_vector(
                 f"steering vector hidden size {source_vector.numel()} does not match "
                 f"layer hidden size {hidden.shape[-1]}"
             )
-        scaled = source_vector.to(device=hidden.device, dtype=hidden.dtype) * float(
-            alpha
-        )
+        cache_key = (hidden.device, hidden.dtype)
+        scaled = converted_vectors.get(cache_key)
+        if scaled is None:
+            scaled = source_vector.to(device=hidden.device, dtype=hidden.dtype) * float(
+                alpha
+            )
+            converted_vectors[cache_key] = scaled
         steered = hidden.clone()
         steered[:, -1, :] = steered[:, -1, :] + scaled
         return _replace_hidden(output, steered)
