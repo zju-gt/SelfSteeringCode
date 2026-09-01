@@ -1,0 +1,12 @@
+model:
+  name: Qwen/Qwen2.5-7B-Instruct
+  revision: main
+  num_hidden_layers: 28
+  dtype: bfloat16
+  device_map: auto
+  attention_implementation: sdpa
+  trust_remote_code: false
+  use_cache: true
+  max_new_tokens: 2048
+  do_sample: false
+

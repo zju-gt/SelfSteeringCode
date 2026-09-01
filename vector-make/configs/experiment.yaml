@@ -1,0 +1,27 @@
+experiment:
+  capabilities:
+    - QLl
+    - QLq
+    - CL
+    - MCr
+  target_layer: 19
+  high_demand_threshold: 4
+  low_demand_threshold: 1
+  vector_scaling: mean_norm
+  alphas:
+    - -1.0
+    - -0.5
+    - 0.0
+    - 0.5
+    - 1.0
+  seed: 42
+  annotation:
+    model: gpt-5.6-terra
+    max_workers: 8
+    max_attempts: 5
+    initial_backoff_seconds: 1.0
+  paths:
+    rubrics_dir: rubrics
+    data_dir: data
+    outputs_dir: outputs
+

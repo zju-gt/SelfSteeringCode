@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "self-steering-mvp"
+version = "0.1.0"
+description = "Capability-grounded activation steering experiments"
+requires-python = ">=3.10"
+dependencies = [
+    "datasets>=2.18",
+    "openai>=1.40",
+    "pyyaml>=6.0",
+    "safetensors>=0.4",
+    "torch>=2.1",
+    "transformers>=4.43",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+

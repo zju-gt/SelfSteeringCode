@@ -1,0 +1,38 @@
+data:
+  cache_dir: .cache/huggingface
+  prepared_dir: data/processed
+  enabled_steering_datasets:
+    - math500
+  sources:
+    mmlu:
+      path: cais/mmlu
+      name: all
+      split: test
+      local_path: null
+    math500:
+      path: HuggingFaceH4/MATH-500
+      split: test
+      local_path: null
+    aime2024:
+      path: OpenRLHF/aime-2024
+      split: train
+      local_path: null
+    aime2025:
+      path: test-time-compute/aime_2025
+      split: train
+      local_path: null
+    aime2026:
+      path: 96kevinli29/aime2026-en
+      split: train
+      local_path: null
+    arc_c:
+      path: allenai/ai2_arc
+      name: ARC-Challenge
+      split: test
+      local_path: null
+    obqa:
+      path: allenai/openbookqa
+      name: main
+      split: test
+      local_path: null
+
