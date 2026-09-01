@@ -51,4 +51,3 @@ def print_paths(paths: Any) -> None:
     else:
         payload = str(paths)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-

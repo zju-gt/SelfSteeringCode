@@ -10,11 +10,11 @@ requires-python = ">=3.10"
 dependencies = [
     "accelerate>=0.30",
     "datasets>=2.18",
-    "openai>=1.40",
+    "openai>=1.66",
     "pyyaml>=6.0",
     "safetensors>=0.4",
     "torch>=2.1",
-    "transformers>=4.43",
+    "transformers>=4.45,<5",
 ]
 
 [project.optional-dependencies]

@@ -17,6 +17,14 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def sha256_file(path: Path | str) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def read_jsonl(path: Path | str) -> Iterator[dict[str, Any]]:
     with Path(path).open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
@@ -25,7 +33,9 @@ def read_jsonl(path: Path | str) -> Iterator[dict[str, Any]]:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError as exc:
-                raise ValueError(f"invalid JSONL at {path}:{line_number}: {exc}") from exc
+                raise ValueError(
+                    f"invalid JSONL at {path}:{line_number}: {exc}"
+                ) from exc
             if not isinstance(row, dict):
                 raise ValueError(f"JSONL row must be an object at {path}:{line_number}")
             yield row
@@ -47,7 +57,9 @@ def write_jsonl(path: Path | str, rows: Iterable[Mapping[str, Any]]) -> None:
     try:
         with temporary.open("w", encoding="utf-8", newline="\n") as handle:
             for row in rows:
-                handle.write(json.dumps(dict(row), ensure_ascii=False, sort_keys=True) + "\n")
+                handle.write(
+                    json.dumps(dict(row), ensure_ascii=False, sort_keys=True) + "\n"
+                )
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, destination)
@@ -89,4 +101,3 @@ def atomic_save_tensors(
 
 def _temporary_sibling(path: Path) -> Path:
     return path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-

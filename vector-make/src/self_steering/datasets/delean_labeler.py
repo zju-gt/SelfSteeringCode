@@ -142,6 +142,22 @@ def label_one_dimension(
 T = TypeVar("T")
 
 
+def _is_transient_exception(error: Exception) -> bool:
+    if isinstance(error, (TimeoutError, ConnectionError)):
+        return True
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int) and (
+        status_code in {408, 409, 429} or status_code >= 500
+    ):
+        return True
+    return type(error).__name__ in {
+        "APIConnectionError",
+        "APITimeoutError",
+        "InternalServerError",
+        "RateLimitError",
+    }
+
+
 def retry_call(
     operation: Callable[[], T],
     *,
@@ -154,9 +170,8 @@ def retry_call(
     for attempt in range(1, max_attempts + 1):
         try:
             return operation()
-        except Exception:
-            if attempt == max_attempts:
+        except Exception as error:
+            if not _is_transient_exception(error) or attempt == max_attempts:
                 raise
             sleep(initial_backoff_seconds * (2 ** (attempt - 1)))
     raise AssertionError("unreachable")
-

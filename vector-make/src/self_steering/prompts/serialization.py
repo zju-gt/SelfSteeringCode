@@ -9,9 +9,7 @@ def answer_instruction(answer_type: str, dataset: str) -> str:
     if answer_type == "choice":
         return "Conclude with `Final Answer: X`, where X is only the uppercase option letter."
     if dataset.lower().startswith("aime"):
-        return (
-            "Conclude with `Final Answer: \\boxed{N}`, where N is one integer from 0 to 999."
-        )
+        return "Conclude with `Final Answer: \\boxed{N}`, where N is one integer from 0 to 999."
     if answer_type == "math":
         return "Conclude with `Final Answer: \\boxed{...}` containing only the final answer."
     raise ValueError(f"unsupported answer type: {answer_type!r}")
@@ -50,4 +48,3 @@ def serialize_reasoning_prefill(
         add_generation_prompt=False,
         continue_final_message=True,
     )
-

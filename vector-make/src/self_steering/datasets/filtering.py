@@ -51,4 +51,3 @@ def demand_memberships(
         elif score <= low_threshold:
             memberships[capability] = "low"
     return memberships
-

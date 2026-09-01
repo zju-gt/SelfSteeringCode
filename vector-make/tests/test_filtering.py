@@ -23,4 +23,3 @@ def test_memberships_allow_dimension_overlap() -> None:
 def test_demand_slice_rejects_missing_dimension() -> None:
     with pytest.raises(ValueError, match="missing demand score"):
         demand_slice([{"item_id": "x", "demand_scores": {}}], "QLl", "high", 4, 1)
-

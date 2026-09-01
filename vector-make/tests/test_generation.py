@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 import torch
 from torch import nn
@@ -67,4 +65,3 @@ def test_generation_is_greedy_and_decodes_only_new_tokens() -> None:
     assert tokenizer.decoded.tolist() == [7, 8]
     assert model.kwargs["do_sample"] is False
     assert model.kwargs["use_cache"] is True
-

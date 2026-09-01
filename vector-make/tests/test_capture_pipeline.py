@@ -10,7 +10,9 @@ class TinyCaptureModel(nn.Module):
         self.layer = nn.Linear(2, 2, bias=False)
         self.layer.weight.data.copy_(torch.eye(2))
         self.embedding = nn.Embedding(10, 2)
-        self.embedding.weight.data.copy_(torch.arange(20, dtype=torch.float32).reshape(10, 2))
+        self.embedding.weight.data.copy_(
+            torch.arange(20, dtype=torch.float32).reshape(10, 2)
+        )
 
     def get_input_embeddings(self):
         return self.embedding
@@ -29,4 +31,3 @@ def test_contrast_delta_subtracts_generic_from_capability() -> None:
     generic = torch.tensor([1.0, 2.0])
     capability = torch.tensor([4.0, 8.0])
     assert torch.equal(contrast_delta(capability, generic), torch.tensor([3.0, 6.0]))
-

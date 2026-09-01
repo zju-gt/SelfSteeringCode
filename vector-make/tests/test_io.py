@@ -7,6 +7,7 @@ from self_steering.utils.io import (
     atomic_save_json,
     atomic_save_tensors,
     read_jsonl,
+    sha256_file,
     sha256_text,
 )
 
@@ -29,5 +30,13 @@ def test_atomic_writers_create_complete_artifacts(tmp_path: Path) -> None:
 
 
 def test_sha256_text_is_stable() -> None:
-    assert sha256_text("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    assert (
+        sha256_text("abc")
+        == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    )
 
+
+def test_sha256_file_hashes_binary_content(tmp_path: Path) -> None:
+    path = tmp_path / "artifact.bin"
+    path.write_bytes(b"abc")
+    assert sha256_file(path) == sha256_text("abc")

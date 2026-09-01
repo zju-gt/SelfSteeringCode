@@ -26,6 +26,25 @@ def completed_annotation_keys(rows: Iterable[dict[str, Any]]) -> set[AnnotationK
     return completed
 
 
+def current_annotation_rows(
+    rows: Iterable[dict[str, Any]],
+    expected_keys: set[AnnotationKey],
+) -> list[dict[str, Any]]:
+    """Return only the latest successful row for each current full hash key."""
+
+    current: dict[AnnotationKey, dict[str, Any]] = {}
+    for row in rows:
+        if row.get("status") != "ok":
+            continue
+        try:
+            key = annotation_key(row)
+        except KeyError:
+            continue
+        if key in expected_keys:
+            current[key] = row
+    return list(current.values())
+
+
 def score_items(
     items: Iterable[CanonicalItem],
     dimensions: Sequence[str],
@@ -84,7 +103,9 @@ def annotations_to_wide(
     for row in rows:
         if row.get("status") != "ok" or row.get("demand") not in dimensions:
             continue
-        scores.setdefault(str(row["item_id"]), {})[str(row["demand"])] = int(row["level"])
+        scores.setdefault(str(row["item_id"]), {})[str(row["demand"])] = int(
+            row["level"]
+        )
 
     wide: list[dict[str, Any]] = []
     required = set(dimensions)
@@ -96,7 +117,8 @@ def annotations_to_wide(
                 f"missing successful annotations for {item.item_id}: {', '.join(sorted(missing))}"
             )
         record = item.to_dict()
-        record["demand_scores"] = {dimension: item_scores[dimension] for dimension in dimensions}
+        record["demand_scores"] = {
+            dimension: item_scores[dimension] for dimension in dimensions
+        }
         wide.append(record)
     return wide
-

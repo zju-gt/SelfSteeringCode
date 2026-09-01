@@ -40,4 +40,3 @@ def aggregate_capability_vectors(
         }
         for capability, raw in raw_vectors.items()
     }
-

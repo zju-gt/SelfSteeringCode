@@ -52,4 +52,3 @@ def load_vector_library(
         vectors.setdefault(capability, {})[form] = tensor
     metadata = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
     return vectors, metadata
-

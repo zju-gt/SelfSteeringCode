@@ -33,13 +33,17 @@ def add_steering_vector(
     def hook(module: nn.Module, inputs: tuple[Any, ...], output: Any) -> Any:
         hidden = output[0] if isinstance(output, tuple) else output
         if not isinstance(hidden, torch.Tensor) or hidden.ndim != 3:
-            raise TypeError("decoder layer output must be a [batch, sequence, hidden] tensor")
+            raise TypeError(
+                "decoder layer output must be a [batch, sequence, hidden] tensor"
+            )
         if hidden.shape[-1] != source_vector.numel():
             raise ValueError(
                 f"steering vector hidden size {source_vector.numel()} does not match "
                 f"layer hidden size {hidden.shape[-1]}"
             )
-        scaled = source_vector.to(device=hidden.device, dtype=hidden.dtype) * float(alpha)
+        scaled = source_vector.to(device=hidden.device, dtype=hidden.dtype) * float(
+            alpha
+        )
         steered = hidden.clone()
         steered[:, -1, :] = steered[:, -1, :] + scaled
         return _replace_hidden(output, steered)
@@ -49,4 +53,3 @@ def add_steering_vector(
         yield
     finally:
         handle.remove()
-

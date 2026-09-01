@@ -29,7 +29,9 @@ def test_cosine_matrix_and_coherence() -> None:
     matrix = cosine_similarity_matrix(vectors)
     assert matrix["a"]["a"] == pytest.approx(1.0)
     assert matrix["a"]["b"] == pytest.approx(0.0)
-    assert vector_coherence(torch.tensor([[1.0, 0.0], [2.0, 0.0]])) == pytest.approx(1.0)
+    assert vector_coherence(torch.tensor([[1.0, 0.0], [2.0, 0.0]])) == pytest.approx(
+        1.0
+    )
 
 
 def test_vector_library_round_trip(tmp_path: Path) -> None:
@@ -40,4 +42,3 @@ def test_vector_library_round_trip(tmp_path: Path) -> None:
     loaded, metadata = load_vector_library(tensor_path, metadata_path)
     assert torch.equal(loaded["QLl"]["raw"], torch.tensor([1.0, 2.0]))
     assert metadata["layer"] == 19
-

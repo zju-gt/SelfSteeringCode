@@ -13,4 +13,3 @@ Form an abstraction that explains the examples and apply it to the new case.""",
     "MCr": """Identify which information is necessary.
 Separate relevant evidence from distractors before solving the problem.""",
 }
-

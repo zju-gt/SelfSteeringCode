@@ -37,11 +37,13 @@ def test_generic_and_capability_change_only_reasoning_instruction() -> None:
     generic = build_chat_messages(GENERIC_PROMPT, "Q", "format")
     capability = build_chat_messages(CAPABILITY_PROMPTS["QLq"], "Q", "format")
     assert generic[-1] == capability[-1]
-    assert generic[0]["content"].split("\n\nQuestion:", 1)[1] == capability[0]["content"].split("\n\nQuestion:", 1)[1]
+    assert (
+        generic[0]["content"].split("\n\nQuestion:", 1)[1]
+        == capability[0]["content"].split("\n\nQuestion:", 1)[1]
+    )
 
 
 def test_answer_instructions_are_dataset_specific() -> None:
     assert "option letter" in answer_instruction("choice", "arc_c")
     assert "boxed" in answer_instruction("math", "math500")
     assert "0 to 999" in answer_instruction("math", "aime2026")
-

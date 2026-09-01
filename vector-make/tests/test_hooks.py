@@ -64,4 +64,3 @@ def test_intervention_rejects_hidden_size_mismatch() -> None:
     with add_steering_vector(block, torch.tensor([1.0, 2.0, 3.0]), alpha=1.0):
         with pytest.raises(ValueError, match="hidden size"):
             block(torch.zeros(1, 1, 2))
-

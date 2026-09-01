@@ -1,4 +1,3 @@
-from functools import partial
 from pathlib import Path
 
 from _common import build_parser, print_paths, resolved_config
@@ -35,7 +34,9 @@ def main() -> None:
             split=item.split,
             prompt=item.prompt,
             dimension=dimension,
-            domain=str(item.metadata.get("subject")) if item.metadata.get("subject") else None,
+            domain=str(item.metadata.get("subject"))
+            if item.metadata.get("subject")
+            else None,
         )
 
     def label(item, dimension):
@@ -48,15 +49,18 @@ def main() -> None:
                 model=model,
             ),
             max_attempts=int(annotation.get("max_attempts", 5)),
-            initial_backoff_seconds=float(annotation.get("initial_backoff_seconds", 1.0)),
+            initial_backoff_seconds=float(
+                annotation.get("initial_backoff_seconds", 1.0)
+            ),
         )
 
     def key(item, dimension):
-        return expected_annotation_key(request_for(item, dimension), rubrics[dimension], model)
+        return expected_annotation_key(
+            request_for(item, dimension), rubrics[dimension], model
+        )
 
     print_paths(score_demands(config, label, expected_key_fn=key))
 
 
 if __name__ == "__main__":
     main()
-

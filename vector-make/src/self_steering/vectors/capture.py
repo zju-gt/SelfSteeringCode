@@ -28,7 +28,9 @@ def capture_activation(
 def contrast_delta(capability: torch.Tensor, generic: torch.Tensor) -> torch.Tensor:
     if capability.shape != generic.shape:
         raise ValueError("capability and generic activations must have matching shapes")
-    return capability.detach().cpu().to(torch.float32) - generic.detach().cpu().to(torch.float32)
+    return capability.detach().cpu().to(torch.float32) - generic.detach().cpu().to(
+        torch.float32
+    )
 
 
 def capture_prompt_contrast(
@@ -40,4 +42,3 @@ def capture_prompt_contrast(
     generic = capture_activation(model, layer, generic_input_ids)
     capability = capture_activation(model, layer, capability_input_ids)
     return contrast_delta(capability, generic)
-

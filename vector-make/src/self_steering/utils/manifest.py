@@ -33,4 +33,3 @@ def build_manifest(
         "rubric_hashes": rubric_hashes or {},
         "prompt_hashes": prompt_hashes or {},
     }
-

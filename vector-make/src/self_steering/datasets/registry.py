@@ -48,14 +48,20 @@ class DatasetRegistry:
     @classmethod
     def default(cls) -> "DatasetRegistry":
         registry = cls()
-        registry.register("mmlu", partial(_load_source, dataset="mmlu", adapter=adapt_mmlu))
+        registry.register(
+            "mmlu", partial(_load_source, dataset="mmlu", adapter=adapt_mmlu)
+        )
         registry.register(
             "math500", partial(_load_source, dataset="math500", adapter=adapt_math500)
         )
         for name in ("aime2024", "aime2025", "aime2026"):
             registry.register(
                 name,
-                partial(_load_source, dataset=name, adapter=partial(adapt_aime, dataset=name)),
+                partial(
+                    _load_source,
+                    dataset=name,
+                    adapter=partial(adapt_aime, dataset=name),
+                ),
             )
         registry.register(
             "arc_c",
@@ -115,4 +121,3 @@ def _load_source(
             yield CanonicalItem.from_dict(record)
         else:
             yield adapter(record, split=split, index=index)
-

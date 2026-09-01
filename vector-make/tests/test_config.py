@@ -47,7 +47,10 @@ def test_load_config_applies_dot_path_override(tmp_path: Path) -> None:
 
     config = load_config(
         [path],
-        overrides=["experiment.target_layer=18", "data.enabled_steering_datasets=[math500, aime2026]"],
+        overrides=[
+            "experiment.target_layer=18",
+            "data.enabled_steering_datasets=[math500, aime2026]",
+        ],
     )
 
     assert config["experiment"]["target_layer"] == 18
@@ -82,4 +85,3 @@ def test_load_config_rejects_unknown_dataset(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="unknown dataset"):
         load_config([path])
-

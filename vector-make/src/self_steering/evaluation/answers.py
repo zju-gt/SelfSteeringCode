@@ -81,4 +81,3 @@ def is_correct(
         except ValueError:
             return False
     return predicted_normalized == gold_normalized
-

@@ -33,15 +33,24 @@ class CanonicalItem:
             if not self.choices:
                 raise ValueError(f"choice item requires choices: {self.item_id}")
             if any(not key.isalpha() or key != key.upper() for key in self.choices):
-                raise ValueError(f"choice labels must be uppercase letters: {self.item_id}")
+                raise ValueError(
+                    f"choice labels must be uppercase letters: {self.item_id}"
+                )
             if self.gold_answer.upper() not in self.choices:
-                raise ValueError(f"gold answer is not present in choices: {self.item_id}")
+                raise ValueError(
+                    f"gold answer is not present in choices: {self.item_id}"
+                )
 
-        if self.dataset.lower().startswith("aime") or self.metadata.get("competition") == "AIME":
+        if (
+            self.dataset.lower().startswith("aime")
+            or self.metadata.get("competition") == "AIME"
+        ):
             try:
                 answer = int(self.gold_answer)
             except ValueError as exc:
-                raise ValueError(f"AIME answer must be an integer: {self.item_id}") from exc
+                raise ValueError(
+                    f"AIME answer must be an integer: {self.item_id}"
+                ) from exc
             if not 0 <= answer <= 999:
                 raise ValueError(f"AIME answer must be in [0, 999]: {self.item_id}")
 
@@ -67,4 +76,3 @@ class CanonicalItem:
         )
         item.validate()
         return item
-

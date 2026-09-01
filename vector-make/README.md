@@ -77,17 +77,18 @@ python scripts/07_score_generations.py --config configs/model.yaml --config conf
 
 Stages use incremental JSONL or per-item safetensors artifacts. Re-running a stage resumes completed annotation, capture, or generation keys.
 
-Use `--limit N` on data preparation for a small source smoke run. API/GPU stages should use separate low-volume data configuration when validating server setup.
+Use `--limit N` on stages 00, 01, 03, and 06 for a small end-to-end server smoke run. The limit is applied per dataset (and per capability during capture), including when a preceding stage prepared a larger file.
 
 ## Outputs
 
 ```text
 data/processed/             canonical data and demand slices
 data/scored/                long and wide DeLeAn annotations
-outputs/activations/        per-item capability contrast shards
-outputs/vectors/            raw, unit, and mean-norm vectors
-outputs/generations/        incremental steered generations
-outputs/metrics/            similarity, coherence, accuracy, and specificity
+outputs/activations/<id>/   indexed per-item capability contrast shards
+outputs/vectors/<id>/       raw, unit, and mean-norm vectors
+outputs/generations/<id>.jsonl
+                            resumable steered generations
+outputs/metrics/<id>_*      similarity, coherence, paired accuracy, and specificity
 outputs/manifests/          resolved run metadata
 ```
 
@@ -101,4 +102,3 @@ python -m compileall -q src scripts tests
 ```
 
 Passing the offline suite verifies pipeline logic only. It does not claim that a full 7B GPU run or live annotation job has completed.
-

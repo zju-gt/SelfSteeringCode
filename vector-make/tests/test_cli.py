@@ -57,6 +57,9 @@ def test_prepare_data_cli_runs_with_local_fixtures(tmp_path: Path) -> None:
         cwd=ROOT,
     )
     assert result.returncode == 0, result.stderr
-    rows = (tmp_path / "data" / "processed" / "math500.jsonl").read_text(encoding="utf-8").splitlines()
+    rows = (
+        (tmp_path / "data" / "processed" / "math500.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     assert len(rows) == 1
-

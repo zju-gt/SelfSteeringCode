@@ -1,4 +1,8 @@
-from self_steering.evaluation.answers import extract_answer, is_correct, normalize_math_answer
+from self_steering.evaluation.answers import (
+    extract_answer,
+    is_correct,
+    normalize_math_answer,
+)
 
 
 def test_extracts_last_boxed_answer_with_nested_braces() -> None:
@@ -25,4 +29,3 @@ def test_math_normalization_removes_common_wrappers() -> None:
 def test_missing_answer_is_incorrect() -> None:
     assert extract_answer("unfinished reasoning", "math") is None
     assert not is_correct(None, "2", dataset="math500", answer_type="math")
-

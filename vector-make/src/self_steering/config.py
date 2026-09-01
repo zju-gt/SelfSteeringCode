@@ -106,7 +106,9 @@ def validate_config(config: dict[str, Any]) -> None:
         )
 
     enabled = data.get("enabled_steering_datasets", [])
-    if not isinstance(enabled, list) or not all(isinstance(name, str) for name in enabled):
+    if not isinstance(enabled, list) or not all(
+        isinstance(name, str) for name in enabled
+    ):
         raise ConfigError("data.enabled_steering_datasets must be a list of names")
     unknown = sorted(set(enabled) - (SUPPORTED_DATASETS - {"mmlu"}))
     if unknown:
@@ -115,11 +117,17 @@ def validate_config(config: dict[str, Any]) -> None:
     high = experiment.get("high_demand_threshold")
     low = experiment.get("low_demand_threshold")
     if not isinstance(high, int) or not 0 <= high <= 5:
-        raise ConfigError("experiment.high_demand_threshold must be an integer from 0 to 5")
+        raise ConfigError(
+            "experiment.high_demand_threshold must be an integer from 0 to 5"
+        )
     if not isinstance(low, int) or not 0 <= low <= 5:
-        raise ConfigError("experiment.low_demand_threshold must be an integer from 0 to 5")
+        raise ConfigError(
+            "experiment.low_demand_threshold must be an integer from 0 to 5"
+        )
     if low >= high:
-        raise ConfigError("low_demand_threshold must be smaller than high_demand_threshold")
+        raise ConfigError(
+            "low_demand_threshold must be smaller than high_demand_threshold"
+        )
 
     scaling = experiment.get("vector_scaling")
     if scaling not in SUPPORTED_VECTOR_SCALINGS:
@@ -128,10 +136,14 @@ def validate_config(config: dict[str, Any]) -> None:
         )
 
     alphas = experiment.get("alphas")
-    if not isinstance(alphas, list) or not alphas or not all(
-        isinstance(alpha, (int, float)) and not isinstance(alpha, bool) for alpha in alphas
+    if (
+        not isinstance(alphas, list)
+        or not alphas
+        or not all(
+            isinstance(alpha, (int, float)) and not isinstance(alpha, bool)
+            for alpha in alphas
+        )
     ):
         raise ConfigError("experiment.alphas must be a non-empty list of numbers")
     if not any(float(alpha) == 0.0 for alpha in alphas):
         raise ConfigError("experiment.alphas must include zero for the baseline")
-

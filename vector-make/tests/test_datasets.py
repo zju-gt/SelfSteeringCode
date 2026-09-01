@@ -41,6 +41,29 @@ def test_aime2026_schema_is_canonicalized() -> None:
     assert item.metadata["competition"] == "AIME"
 
 
+def test_aime2024_chat_prompt_and_label_are_canonicalized() -> None:
+    item = adapt_aime(
+        {
+            "prompt": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Solve the following math problem step by step. Please put your "
+                        "final answer within \\boxed{}.\n\nCompute 1+1.\n\nRemember to "
+                        "put your final answer within \\boxed{}."
+                    ),
+                }
+            ],
+            "label": "002",
+        },
+        dataset="aime2024",
+        split="train",
+        index=0,
+    )
+    assert item.prompt == "Compute 1+1."
+    assert item.gold_answer == "002"
+
+
 def test_math500_schema_prefers_answer_field() -> None:
     item = adapt_math500(
         {"problem": "Compute.", "answer": "42", "solution": "work", "unique_id": "x"},
@@ -54,7 +77,12 @@ def test_math500_schema_prefers_answer_field() -> None:
 
 def test_mmlu_renders_lettered_choices() -> None:
     item = adapt_mmlu(
-        {"question": "Pick.", "choices": ["one", "two"], "answer": 1, "subject": "logic"},
+        {
+            "question": "Pick.",
+            "choices": ["one", "two"],
+            "answer": 1,
+            "subject": "logic",
+        },
         split="test",
         index=3,
     )
@@ -86,10 +114,20 @@ def test_local_override_reads_canonical_jsonl() -> None:
 
 def test_registry_rejects_duplicate_item_ids() -> None:
     registry = DatasetRegistry()
-    registry.register("duplicate", lambda config: [
-        adapt_math500({"problem": "a", "answer": "1", "unique_id": "same"}, split="test", index=0),
-        adapt_math500({"problem": "b", "answer": "2", "unique_id": "same"}, split="test", index=1),
-    ])
+    registry.register(
+        "duplicate",
+        lambda config: [
+            adapt_math500(
+                {"problem": "a", "answer": "1", "unique_id": "same"},
+                split="test",
+                index=0,
+            ),
+            adapt_math500(
+                {"problem": "b", "answer": "2", "unique_id": "same"},
+                split="test",
+                index=1,
+            ),
+        ],
+    )
     with pytest.raises(ValueError, match="duplicate item_id"):
         registry.load("duplicate", {})
-

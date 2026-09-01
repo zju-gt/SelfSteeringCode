@@ -1,6 +1,7 @@
 model:
   name: Qwen/Qwen2.5-7B-Instruct
   revision: main
+  cache_dir: null
   num_hidden_layers: 28
   dtype: bfloat16
   device_map: auto
@@ -9,4 +10,3 @@ model:
   use_cache: true
   max_new_tokens: 2048
   do_sample: false
-

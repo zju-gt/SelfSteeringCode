@@ -44,4 +44,3 @@ def test_canonical_item_rejects_invalid_aime_answer() -> None:
     )
     with pytest.raises(ValueError, match="AIME"):
         item.validate()
-

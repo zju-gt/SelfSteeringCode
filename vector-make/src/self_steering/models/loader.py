@@ -58,4 +58,3 @@ def resolve_decoder_layer(model: Any, index: int) -> nn.Module:
     if not isinstance(layer, nn.Module):
         return layer
     return layer
-

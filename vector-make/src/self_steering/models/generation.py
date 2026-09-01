@@ -51,4 +51,3 @@ def generate_with_optional_steering(
         output_ids = model.generate(**kwargs)
     new_tokens = output_ids[0, prompt_ids.shape[1] :].detach().cpu()
     return tokenizer.decode(new_tokens, skip_special_tokens=True)
-

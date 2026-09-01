@@ -21,6 +21,33 @@ def _last_boxed(text: str) -> str | None:
     return matches[-1].strip() if matches else None
 
 
+def _prompt_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple)):
+        messages = [message for message in value if isinstance(message, Mapping)]
+        user_messages = [
+            message for message in messages if message.get("role") == "user"
+        ]
+        candidates = user_messages or messages
+        if candidates and isinstance(candidates[-1].get("content"), str):
+            return candidates[-1]["content"].strip()
+    raise ValueError("prompt must be a string or a chat message list")
+
+
+def _strip_aime_wrapper(text: str) -> str:
+    prefix = (
+        "Solve the following math problem step by step. Please put your final answer "
+        "within \\boxed{}.\n\n"
+    )
+    suffix = "\n\nRemember to put your final answer within \\boxed{}."
+    if text.startswith(prefix):
+        text = text[len(prefix) :]
+    if text.endswith(suffix):
+        text = text[: -len(suffix)]
+    return text.strip()
+
+
 def _render_choice_prompt(question: str, choices: Mapping[str, str]) -> str:
     rendered = "\n".join(f"{label}. {text}" for label, text in choices.items())
     return f"{question.strip()}\n\nChoices:\n{rendered}"
@@ -90,9 +117,12 @@ def adapt_aime(
     split: str,
     index: int,
 ) -> CanonicalItem:
-    problem = str(_first_present(row, ["problem", "question", "prompt"]))
+    raw_problem = _first_present(row, ["problem", "question", "prompt"])
+    problem = _strip_aime_wrapper(_prompt_text(raw_problem))
     try:
-        raw_answer = _first_present(row, ["ground_truth", "answer", "gold_answer"])
+        raw_answer = _first_present(
+            row, ["ground_truth", "answer", "gold_answer", "label"]
+        )
         answer = str(raw_answer).strip()
     except ValueError:
         solution = str(_first_present(row, ["solution", "response"]))
@@ -133,18 +163,26 @@ def adapt_multiple_choice(
     if isinstance(raw_choices, Mapping):
         labels = raw_choices.get("label")
         texts = raw_choices.get("text")
-        if not isinstance(labels, (list, tuple)) or not isinstance(texts, (list, tuple)):
+        if not isinstance(labels, (list, tuple)) or not isinstance(
+            texts, (list, tuple)
+        ):
             raise ValueError("choices must contain label and text lists")
         if len(labels) != len(texts) or not labels:
-            raise ValueError("choices label and text lists must have equal non-zero length")
+            raise ValueError(
+                "choices label and text lists must have equal non-zero length"
+            )
         choices = {str(label).upper(): str(text) for label, text in zip(labels, texts)}
     elif isinstance(raw_choices, (list, tuple)):
         choices = {ascii_uppercase[i]: str(text) for i, text in enumerate(raw_choices)}
     else:
         raise ValueError("choices must be a mapping or list")
-    answer = str(_first_present(row, ["answerKey", "answer", "gold_answer"])).strip().upper()
+    answer = (
+        str(_first_present(row, ["answerKey", "answer", "gold_answer"])).strip().upper()
+    )
     item = CanonicalItem(
-        item_id=str(row.get("item_id") or row.get("id") or f"{dataset}_{split}_{index:05d}"),
+        item_id=str(
+            row.get("item_id") or row.get("id") or f"{dataset}_{split}_{index:05d}"
+        ),
         dataset=dataset,
         split=split,
         prompt=_render_choice_prompt(question, choices),
@@ -155,4 +193,3 @@ def adapt_multiple_choice(
     )
     item.validate()
     return item
-

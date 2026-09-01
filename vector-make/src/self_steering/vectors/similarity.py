@@ -39,4 +39,3 @@ def vector_coherence(deltas: torch.Tensor) -> float:
     similarities = normalized @ normalized.T
     mask = ~torch.eye(values.shape[0], dtype=torch.bool)
     return float(similarities[mask].mean().item())
-
