@@ -1,0 +1,2 @@
+{"item_id":"mmlu_test_0","dataset":"mmlu","split":"test","prompt":"Pick one.\n\nChoices:\nA. yes\nB. no","gold_answer":"A","answer_type":"choice","choices":{"A":"yes","B":"no"},"metadata":{"subject":"logic"}}
+
