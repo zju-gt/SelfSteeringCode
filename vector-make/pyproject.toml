@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Capability-grounded activation steering experiments"
 requires-python = ">=3.10"
 dependencies = [
+    "accelerate>=0.30",
     "datasets>=2.18",
     "openai>=1.40",
     "pyyaml>=6.0",
@@ -25,4 +26,3 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-
