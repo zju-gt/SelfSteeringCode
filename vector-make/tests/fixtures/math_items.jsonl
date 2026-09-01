@@ -1,0 +1,3 @@
+{"item_id":"math500_test_0","dataset":"math500","split":"test","prompt":"Compute 1+1.","gold_answer":"2","answer_type":"math","choices":null,"metadata":{"subject":"algebra"}}
+{"item_id":"math500_test_1","dataset":"math500","split":"test","prompt":"Compute 2+3.","gold_answer":"5","answer_type":"math","choices":null,"metadata":{"subject":"algebra"}}
+
