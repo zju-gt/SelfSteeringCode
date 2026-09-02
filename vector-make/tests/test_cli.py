@@ -5,6 +5,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = ROOT / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+from _common import build_parser, resolved_config
+
+
 SCRIPTS = [
     "00_prepare_data.py",
     "01_score_demands.py",
@@ -36,22 +42,19 @@ def test_every_cli_provides_help_without_loading_model() -> None:
         )
         assert result.returncode == 0, f"{name}: {result.stderr}"
         assert "--config" in result.stdout
+        assert "replaces the default" in result.stdout
         assert "--override" in result.stdout
 
 
-def test_prepare_data_cli_runs_with_local_fixtures(tmp_path: Path) -> None:
+def test_prepare_data_cli_uses_default_configs_from_any_working_directory(
+    tmp_path: Path,
+) -> None:
     mmlu = ROOT / "tests" / "fixtures" / "mmlu_items.jsonl"
     math500 = ROOT / "tests" / "fixtures" / "math_items.jsonl"
     result = subprocess.run(
         [
             sys.executable,
             str(ROOT / "scripts" / "00_prepare_data.py"),
-            "--config",
-            str(ROOT / "configs" / "model.yaml"),
-            "--config",
-            str(ROOT / "configs" / "data.yaml"),
-            "--config",
-            str(ROOT / "configs" / "experiment.yaml"),
             "--override",
             f"data.sources.mmlu.local_path={mmlu.as_posix()}",
             "--override",
@@ -65,7 +68,7 @@ def test_prepare_data_cli_runs_with_local_fixtures(tmp_path: Path) -> None:
         ],
         capture_output=True,
         text=True,
-        cwd=ROOT,
+        cwd=tmp_path,
         env=subprocess_env(),
     )
     assert result.returncode == 0, result.stderr
@@ -75,3 +78,31 @@ def test_prepare_data_cli_runs_with_local_fixtures(tmp_path: Path) -> None:
         .splitlines()
     )
     assert len(rows) == 1
+
+
+def test_explicit_config_replaces_default_configs(tmp_path: Path) -> None:
+    config_path = tmp_path / "custom.yaml"
+    config_path.write_text(
+        """
+model:
+  name: custom-model
+  revision: custom-tag
+  num_hidden_layers: 1
+data:
+  enabled_steering_datasets: []
+experiment:
+  capabilities: [QLl, QLq, CL, MCr]
+  target_layer: 0
+  high_demand_threshold: 4
+  low_demand_threshold: 1
+  vector_scaling: raw
+  alphas: [0.0]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    args = build_parser("test").parse_args(["--config", str(config_path)])
+    config = resolved_config(args)
+
+    assert config["model"]["name"] == "custom-model"
+    assert "cache_dir" not in config["model"]

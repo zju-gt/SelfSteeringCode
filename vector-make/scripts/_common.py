@@ -10,14 +10,24 @@ from typing import Any
 from self_steering.config import load_config
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CONFIG_PATHS = (
+    PROJECT_ROOT / "configs" / "model.yaml",
+    PROJECT_ROOT / "configs" / "data.yaml",
+    PROJECT_ROOT / "configs" / "experiment.yaml",
+)
+
+
 def build_parser(description: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--config",
         action="append",
         type=Path,
-        required=True,
-        help="YAML file; repeat to merge files left-to-right",
+        help=(
+            "YAML file; repeat to merge files left-to-right. Supplying any "
+            "--config replaces the default model/data/experiment configs"
+        ),
     )
     parser.add_argument(
         "--override",
@@ -35,7 +45,8 @@ def build_parser(description: str) -> argparse.ArgumentParser:
 
 
 def resolved_config(args: argparse.Namespace) -> dict[str, Any]:
-    config = load_config(args.config, args.override)
+    config_paths = args.config if args.config is not None else DEFAULT_CONFIG_PATHS
+    config = load_config(config_paths, args.override)
     if args.limit is not None:
         if args.limit < 1:
             raise ValueError("--limit must be at least one")
