@@ -1,0 +1,131 @@
+{
+  "artifact_hashes": {
+    "math500_long": "9b2dad78d40f0cc2e5c97536cbf5e79507106db15b82a51a291f7c035193e638",
+    "math500_wide": "0c245c2681ee9ec336babc1ae59e755b909355d40e57badcbcffa66c37c100e1",
+    "mmlu_long": "f10eaa297b91e8ac22f9a31adf3fd069a0514187c8fa81a24904c276857ec134",
+    "mmlu_wide": "44d2521eb78b976beb2ee9cf715009167130ec08cfeec782b42e7449ff746df3"
+  },
+  "config": {
+    "data": {
+      "cache_dir": ".cache/huggingface",
+      "enabled_steering_datasets": [
+        "math500"
+      ],
+      "prepared_dir": "data/processed",
+      "sources": {
+        "aime2024": {
+          "local_path": null,
+          "path": "OpenRLHF/aime-2024",
+          "split": "train"
+        },
+        "aime2025": {
+          "local_path": null,
+          "path": "test-time-compute/aime_2025",
+          "split": "train"
+        },
+        "aime2026": {
+          "local_path": null,
+          "path": "96kevinli29/aime2026-en",
+          "split": "train"
+        },
+        "arc_c": {
+          "local_path": null,
+          "name": "ARC-Challenge",
+          "path": "allenai/ai2_arc",
+          "split": "test"
+        },
+        "math500": {
+          "local_path": "dataset/math500.jsonl",
+          "path": "HuggingFaceH4/MATH-500",
+          "split": "test"
+        },
+        "mmlu": {
+          "local_path": "dataset/mmlu.jsonl",
+          "name": "all",
+          "path": "cais/mmlu",
+          "split": "validation"
+        },
+        "obqa": {
+          "local_path": null,
+          "name": "main",
+          "path": "allenai/openbookqa",
+          "split": "test"
+        }
+      }
+    },
+    "experiment": {
+      "alphas": [
+        -1.0,
+        -0.5,
+        0.0,
+        0.5,
+        1.0
+      ],
+      "annotation": {
+        "initial_backoff_seconds": 1.0,
+        "max_attempts": 5,
+        "max_workers": 8,
+        "model": "gpt-5.4"
+      },
+      "capabilities": [
+        "QLl",
+        "QLq",
+        "CL",
+        "MCr"
+      ],
+      "high_demand_threshold": 4,
+      "low_demand_threshold": 1,
+      "paths": {
+        "data_dir": "data",
+        "outputs_dir": "outputs",
+        "rubrics_dir": "rubrics"
+      },
+      "seed": 42,
+      "target_layer": 19,
+      "vector_scaling": "mean_norm"
+    },
+    "model": {
+      "attention_implementation": "sdpa",
+      "cache_dir": null,
+      "device_map": "auto",
+      "do_sample": false,
+      "dtype": "bfloat16",
+      "max_new_tokens": 2048,
+      "name": "Qwen/Qwen2.5-7B-Instruct",
+      "num_hidden_layers": 28,
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "trust_remote_code": false,
+      "use_cache": true
+    }
+  },
+  "dataset_fingerprints": {
+    "math500_long": "9b2dad78d40f0cc2e5c97536cbf5e79507106db15b82a51a291f7c035193e638",
+    "math500_wide": "0c245c2681ee9ec336babc1ae59e755b909355d40e57badcbcffa66c37c100e1",
+    "mmlu_long": "f10eaa297b91e8ac22f9a31adf3fd069a0514187c8fa81a24904c276857ec134",
+    "mmlu_wide": "44d2521eb78b976beb2ee9cf715009167130ec08cfeec782b42e7449ff746df3"
+  },
+  "model_resolution": {
+    "model_commit": null,
+    "tokenizer_commit": null
+  },
+  "packages": {
+    "datasets": "3.2.0",
+    "openai": "2.13.0",
+    "torch": "2.5.1",
+    "transformers": "4.57.1"
+  },
+  "prompt_hashes": {
+    "capability_prompts": "107f1031b7e2931e33652966e94b725b0f0a4e67aa8a27cb432163759449f9a1",
+    "generic_prompt": "77be45622799a0abf4c17200ed3fe5d365707b9a1c34a38708ee84f48fe3a9f6"
+  },
+  "python": "3.10.16",
+  "rubric_hashes": {
+    "CL": "67576c056cd035c8f3f143e27cb3a6c1ca25559bd20c8c1c487079114ab9888d",
+    "MCr": "f7964b27a61ed3def15eb71ed5f529313479adb6188e2849ccfe3e3ff127669a",
+    "QLl": "cf39f364760795dcdce1d6d21c7a58ddfb4ca54313d0ce4783497f29a7932b9b",
+    "QLq": "e10bdaebb65109c4862743bfb25a7c10532859932af36a0f2266cf64f95bd9a1"
+  },
+  "run_id": "a81b399f7e056b18",
+  "seed": 42,
+  "started_at": "2026-09-02T09:37:12.887823+00:00"
+}
