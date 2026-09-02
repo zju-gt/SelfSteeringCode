@@ -70,26 +70,30 @@ python scripts/00_prepare_data.py --help
 
 ## 3. 配置方式
 
-每个脚本都按从左到右的顺序合并三份配置：
+未显式传入 `--config` 时，每个脚本都会按从左到右的顺序自动合并三份配置：
 
-```bash
-BASE_CONFIG=(
-  --config configs/model.yaml
-  --config configs/data.yaml
-  --config configs/experiment.yaml
-)
+```text
+configs/model.yaml
+configs/data.yaml
+configs/experiment.yaml
 ```
 
 调用示例：
 
 ```bash
-python scripts/00_prepare_data.py "${BASE_CONFIG[@]}"
+python scripts/00_prepare_data.py
+```
+
+如果显式传入一个或多个 `--config`，它们会完全替换上述默认列表：
+
+```bash
+python scripts/00_prepare_data.py --config custom.yaml
 ```
 
 临时修改参数可使用重复的 `--override key=value`，不需要编辑 YAML：
 
 ```bash
-python scripts/06_run_steering.py "${BASE_CONFIG[@]}" \
+python scripts/06_run_steering.py \
   --override experiment.target_layer=18 \
   --override 'experiment.alphas=[0.0,0.5,1.0]'
 ```
@@ -106,7 +110,7 @@ python scripts/06_run_steering.py "${BASE_CONFIG[@]}" \
 ### 4.1 Stage 00：准备 canonical 数据
 
 ```bash
-python scripts/00_prepare_data.py "${BASE_CONFIG[@]}"
+python scripts/00_prepare_data.py
 ```
 
 核心代码：
@@ -134,7 +138,7 @@ data/processed/aime2024.jsonl       # 启用时
 ### 4.2 Stage 01：DeLeAn demand 标注
 
 ```bash
-python scripts/01_score_demands.py "${BASE_CONFIG[@]}"
+python scripts/01_score_demands.py
 ```
 
 核心代码：
@@ -179,7 +183,7 @@ API 调用规模约为：
 ### 4.3 Stage 02：构造提取集和评测集
 
 ```bash
-python scripts/02_prepare_items.py "${BASE_CONFIG[@]}"
+python scripts/02_prepare_items.py
 ```
 
 核心代码：`pipeline.prepare_items` 和 `datasets/filtering.py`。
@@ -221,7 +225,7 @@ stage 05 要求每个 capability 至少有两个成功 capture，因此小规模
 ### 4.4 Stage 03：捕获 prompt contrast
 
 ```bash
-python scripts/03_capture_contrasts.py "${BASE_CONFIG[@]}"
+python scripts/03_capture_contrasts.py
 ```
 
 核心代码：
@@ -259,7 +263,7 @@ outputs/activations/<capture_id>/errors.jsonl       # 有失败时
 ### 4.5 Stage 04：聚合 capability vectors
 
 ```bash
-python scripts/04_extract_vectors.py "${BASE_CONFIG[@]}"
+python scripts/04_extract_vectors.py
 ```
 
 核心代码：`pipeline.extract_vectors`、`vectors/extract.py` 和 `vectors/storage.py`。
@@ -288,7 +292,7 @@ outputs/vectors/<capture_id>/capability_vectors.json
 ### 4.6 Stage 05：分析向量质量
 
 ```bash
-python scripts/05_analyze_similarity.py "${BASE_CONFIG[@]}"
+python scripts/05_analyze_similarity.py
 ```
 
 核心代码：`pipeline.analyze_similarity` 和 `vectors/similarity.py`。
@@ -308,7 +312,7 @@ coherence 没有固定“通过阈值”，主要用于比较 capability 内部�
 ### 4.7 Stage 06：运行 steering generation
 
 ```bash
-python scripts/06_run_steering.py "${BASE_CONFIG[@]}"
+python scripts/06_run_steering.py
 ```
 
 核心代码：
@@ -354,7 +358,7 @@ outputs/generations/<steering_run_id>.jsonl
 ### 4.8 Stage 07：计算评测指标
 
 ```bash
-python scripts/07_score_generations.py "${BASE_CONFIG[@]}"
+python scripts/07_score_generations.py
 ```
 
 核心代码：`pipeline.score_generations` 和 `evaluation/metrics.py`。
@@ -437,14 +441,14 @@ MMLU 始终作为 extraction 数据集，不写入 `enabled_steering_datasets`�
 ### 6.1 默认：只评测 MATH500
 
 ```bash
-python scripts/00_prepare_data.py "${BASE_CONFIG[@]}"
-python scripts/01_score_demands.py "${BASE_CONFIG[@]}"
-python scripts/02_prepare_items.py "${BASE_CONFIG[@]}"
-python scripts/03_capture_contrasts.py "${BASE_CONFIG[@]}"
-python scripts/04_extract_vectors.py "${BASE_CONFIG[@]}"
-python scripts/05_analyze_similarity.py "${BASE_CONFIG[@]}"
-python scripts/06_run_steering.py "${BASE_CONFIG[@]}"
-python scripts/07_score_generations.py "${BASE_CONFIG[@]}"
+python scripts/00_prepare_data.py
+python scripts/01_score_demands.py
+python scripts/02_prepare_items.py
+python scripts/03_capture_contrasts.py
+python scripts/04_extract_vectors.py
+python scripts/05_analyze_similarity.py
+python scripts/06_run_steering.py
+python scripts/07_score_generations.py
 ```
 
 ### 6.2 扩展到 MATH500 和 AIME 2024/2025/2026
@@ -454,14 +458,14 @@ EVALS=(
   --override 'data.enabled_steering_datasets=[math500,aime2024,aime2025,aime2026]'
 )
 
-python scripts/00_prepare_data.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/01_score_demands.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/02_prepare_items.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/03_capture_contrasts.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/04_extract_vectors.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/05_analyze_similarity.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/06_run_steering.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
-python scripts/07_score_generations.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
+python scripts/00_prepare_data.py "${EVALS[@]}"
+python scripts/01_score_demands.py "${EVALS[@]}"
+python scripts/02_prepare_items.py "${EVALS[@]}"
+python scripts/03_capture_contrasts.py "${EVALS[@]}"
+python scripts/04_extract_vectors.py "${EVALS[@]}"
+python scripts/05_analyze_similarity.py "${EVALS[@]}"
+python scripts/06_run_steering.py "${EVALS[@]}"
+python scripts/07_score_generations.py "${EVALS[@]}"
 ```
 
 如需 ARC-C 和 OBQA，可继续追加 `arc_c,obqa`。启用更多数据集意味着 stage 01 会为这些数据集的每道题增加四次 API 标注，并显著增加 stage 06 的生成量。

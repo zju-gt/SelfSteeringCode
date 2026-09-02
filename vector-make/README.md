@@ -47,11 +47,15 @@ Any value can be changed without editing code:
 
 ```bash
 python scripts/06_run_steering.py \
-  --config configs/model.yaml \
-  --config configs/data.yaml \
-  --config configs/experiment.yaml \
   --override experiment.target_layer=18 \
   --override data.enabled_steering_datasets=[math500,aime2024,aime2025,aime2026]
+```
+
+Without `--config`, every numbered script loads the three files above. Supplying
+one or more `--config` arguments completely replaces that default list:
+
+```bash
+python scripts/00_prepare_data.py --config custom.yaml
 ```
 
 Local JSONL sources override Hugging Face downloads:
@@ -65,14 +69,14 @@ Local JSONL sources override Hugging Face downloads:
 Run all commands from the `vector-make` directory:
 
 ```bash
-python scripts/00_prepare_data.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/01_score_demands.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/02_prepare_items.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/03_capture_contrasts.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/04_extract_vectors.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/05_analyze_similarity.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/06_run_steering.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
-python scripts/07_score_generations.py --config configs/model.yaml --config configs/data.yaml --config configs/experiment.yaml
+python scripts/00_prepare_data.py
+python scripts/01_score_demands.py
+python scripts/02_prepare_items.py
+python scripts/03_capture_contrasts.py
+python scripts/04_extract_vectors.py
+python scripts/05_analyze_similarity.py
+python scripts/06_run_steering.py
+python scripts/07_score_generations.py
 ```
 
 Stages use incremental JSONL or per-item safetensors artifacts. Re-running a stage resumes completed annotation, capture, or generation keys.
