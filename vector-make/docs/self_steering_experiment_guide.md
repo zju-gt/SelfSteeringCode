@@ -164,7 +164,7 @@ data/scored/<dataset>_with_4d_demands.jsonl
 
 long 文件每行是一题的一个维度标注；wide 文件把四维分数合并到题目的 `demand_scores`。
 
-该阶段支持并发和增量恢复。成功记录的缓存身份包含题目、rubric、标注模型以及完整 annotation prompt/schema；修改这些内容后不会错误复用旧标注。失败调用写为 `status: error`，重跑时会重新尝试未成功项。
+该阶段支持并发和增量恢复。成功记录的缓存身份包含题目、rubric、标注模型以及完整 annotation prompt/schema；修改这些内容后不会错误复用旧标注。失败调用写为 `status: error`，重跑时会重新尝试未成功项。终端进度条会从已成功的标注数开始；若仍有失败项，脚本会保留 long 文件并报出其路径。修复 API key、网络或限流问题后，直接重跑同一命令即可，不要删除 long 文件。
 
 重点参数：
 

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
 from torch import nn
 
@@ -235,6 +236,27 @@ def test_score_demands_honors_runtime_limit(tmp_path: Path) -> None:
 
     score_demands(config, label)
     assert len(calls) == 4
+
+
+def test_score_demands_preserves_errors_and_explains_how_to_resume(tmp_path: Path) -> None:
+    config = base_config(tmp_path)
+    processed = tmp_path / "data" / "processed"
+    processed.mkdir(parents=True)
+    for dataset in ("mmlu", "math500"):
+        write_jsonl(
+            processed / f"{dataset}.jsonl",
+            [CanonicalItem(f"{dataset}-1", dataset, "test", "q", "1", "math").to_dict()],
+        )
+
+    def fail(item: CanonicalItem, dimension: str) -> dict:
+        raise RuntimeError("invalid API key")
+
+    with pytest.raises(RuntimeError, match="annotations are incomplete.*rerun"):
+        score_demands(config, fail)
+
+    failed_rows = list(read_jsonl(tmp_path / "data" / "scored" / "mmlu_delean_long.jsonl"))
+    assert len(failed_rows) == 2
+    assert {row["status"] for row in failed_rows} == {"error"}
 
 
 class MinimalTokenizer:

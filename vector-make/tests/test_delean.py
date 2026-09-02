@@ -19,6 +19,7 @@ from self_steering.datasets.scoring import (
     current_annotation_rows,
     score_items,
 )
+import self_steering.datasets.scoring as scoring
 from self_steering.datasets.types import CanonicalItem
 from self_steering.utils.io import read_jsonl
 
@@ -144,7 +145,7 @@ def test_score_items_does_not_reuse_stale_hash(tmp_path: Path) -> None:
         )
 
     score_items(
-        [item],
+        iter([item]),
         ["QLl"],
         output,
         label_fn,
@@ -166,6 +167,56 @@ def test_score_items_records_worker_errors(tmp_path: Path) -> None:
     row = list(read_jsonl(output))[0]
     assert row["status"] == "error"
     assert "rate limited" in row["error"]
+
+
+def test_score_items_reports_resumed_work_and_progress(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "annotations.jsonl"
+    output.write_text(
+        json.dumps({"item_id": "i1", "demand": "QLl", "status": "ok", "level": 4})
+        + "\n",
+        encoding="utf-8",
+    )
+    item = CanonicalItem("i1", "mmlu", "test", "task", "A", "choice", {"A": "x"})
+    progress_instances = []
+
+    class FakeProgress:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.updates = []
+            self.closed = False
+            progress_instances.append(self)
+
+        def update(self, amount):
+            self.updates.append(amount)
+
+        def set_postfix(self, **kwargs):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(scoring, "tqdm", FakeProgress, raising=False)
+
+    summary = score_items(
+        [item],
+        ["QLl", "QLq"],
+        output,
+        lambda current, dimension: {
+            "item_id": current.item_id,
+            "demand": dimension,
+            "status": "ok",
+            "level": 4,
+        },
+        max_workers=1,
+    )
+
+    assert summary.total == 2
+    assert summary.resumed == 1
+    assert summary.attempted == 1
+    assert summary.errors == 0
+    assert progress_instances[0].kwargs == {"total": 2, "initial": 1, "desc": "annotations"}
+    assert progress_instances[0].updates == [1]
+    assert progress_instances[0].closed
 
 
 def test_annotations_to_wide_requires_all_dimensions() -> None:

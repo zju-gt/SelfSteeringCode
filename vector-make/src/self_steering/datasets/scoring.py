@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
+
+from tqdm.auto import tqdm
 
 from self_steering.datasets.delean_labeler import annotation_key
 from self_steering.datasets.types import CanonicalItem
@@ -12,6 +15,14 @@ from self_steering.utils.io import append_jsonl, read_jsonl
 
 
 AnnotationKey = tuple[str, str, str, str, str, str]
+
+
+@dataclass(frozen=True)
+class ScoreSummary:
+    total: int
+    resumed: int
+    attempted: int
+    errors: int
 
 
 def completed_annotation_keys(rows: Iterable[dict[str, Any]]) -> set[AnnotationKey]:
@@ -53,7 +64,8 @@ def score_items(
     *,
     max_workers: int,
     expected_key_fn: Callable[[CanonicalItem, str], AnnotationKey] | None = None,
-) -> None:
+) -> ScoreSummary:
+    items = list(items)
     destination = Path(output_path)
     existing = list(read_jsonl(destination)) if destination.exists() else []
     completed_full = completed_annotation_keys(existing)
@@ -72,6 +84,10 @@ def score_items(
                 continue
             jobs.append((item, dimension))
 
+    total = len(items) * len(dimensions)
+    resumed = total - len(jobs)
+    errors = 0
+    progress = tqdm(total=total, initial=resumed, desc=destination.stem)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures: dict[Future[dict[str, Any]], tuple[CanonicalItem, str]] = {
             executor.submit(label_fn, item, dimension): (item, dimension)
@@ -90,7 +106,18 @@ def score_items(
                     "status": "error",
                     "error": repr(exc),
                 }
+            if row.get("status") != "ok":
+                errors += 1
             append_jsonl(destination, row)
+            progress.update(1)
+            progress.set_postfix(resumed=resumed, failed=errors)
+    progress.close()
+    return ScoreSummary(
+        total=total,
+        resumed=resumed,
+        attempted=len(jobs),
+        errors=errors,
+    )
 
 
 def annotations_to_wide(

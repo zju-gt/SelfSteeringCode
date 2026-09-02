@@ -304,6 +304,24 @@ def score_demands(
                 for dimension in dimensions
             }
             long_rows = current_annotation_rows(long_rows, expected_keys)
+            completed = len(long_rows)
+        else:
+            expected_pairs = {
+                (item.item_id, dimension) for item in items for dimension in dimensions
+            }
+            completed_pairs = {
+                (str(row.get("item_id")), str(row.get("demand")))
+                for row in long_rows
+                if row.get("status") == "ok"
+            }
+            completed = len(expected_pairs & completed_pairs)
+        total = len(items) * len(dimensions)
+        if completed != total:
+            raise RuntimeError(
+                f"{name}: annotations are incomplete ({completed}/{total}). "
+                f"Progress is saved in {long_path}. Fix the API errors and rerun "
+                "scripts/01_score_demands.py; successful annotations will be reused."
+            )
         wide = annotations_to_wide(items, long_rows, dimensions=dimensions)
         wide_path = data_dir / "scored" / f"{name}_with_4d_demands.jsonl"
         write_jsonl(wide_path, wide)
