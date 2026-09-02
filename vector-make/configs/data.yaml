@@ -7,12 +7,12 @@ data:
     mmlu:
       path: cais/mmlu
       name: all
-      split: test
-      local_path: null
+      split: validation
+      local_path: dataset/mmlu.jsonl
     math500:
       path: HuggingFaceH4/MATH-500
       split: test
-      local_path: null
+      local_path: dataset/math500.jsonl
     aime2024:
       path: OpenRLHF/aime-2024
       split: train
@@ -35,4 +35,3 @@ data:
       name: main
       split: test
       local_path: null
-
