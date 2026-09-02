@@ -79,7 +79,7 @@ rg -n "from self_steering.pipeline import|print_paths" scripts/[0-7][0-7]_*.py
 
 - [ ] **Step 2: 写 smoke-test 命令**
 
-使用同一组基础配置，并在 00、01、03、06 阶段加入 `--limit 2`。明确 smoke test 仍会在 stage 01 调用 OpenAI API、在 stage 03/06 加载 7B 模型。
+使用同一组基础配置，并在 00、01 阶段从 `--limit 20` 起步；stage 02 后用 `wc -l data/processed/extraction/*.jsonl` 确认每个 capability 至少有 2 个样本，否则提高 limit 后增量重跑。stage 03 和 06 可用 `--limit 2` 控制实际 GPU 工作量。明确 smoke test 仍会在 stage 01 调用 OpenAI API、在 stage 03/06 加载 7B 模型。
 
 - [ ] **Step 3: 写正式实验命令**
 
