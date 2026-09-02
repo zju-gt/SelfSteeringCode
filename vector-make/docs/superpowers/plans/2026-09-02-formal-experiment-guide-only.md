@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `docs/self_steering_experiment_guide.md`
 
-- [ ] **Step 1: Verify the old smoke content is present**
+- [x] **Step 1: Verify the old smoke content is present**
 
 Run:
 
@@ -25,7 +25,7 @@ rg -n -i "smoke|data_smoke|outputs_smoke" docs/self_steering_experiment_guide.md
 
 Expected: matches in the introduction, `max_new_tokens` advice, and the complete smoke-test section.
 
-- [ ] **Step 2: Make the minimal document edit**
+- [x] **Step 2: Make the minimal document edit**
 
 Apply exactly these content changes:
 
@@ -36,7 +36,7 @@ Apply exactly these content changes:
 - renumber the former sections 7–10 to sections 6–9;
 - keep both formal command sets: default MATH500 and MATH500 plus AIME 2024/2025/2026.
 
-- [ ] **Step 3: Verify smoke-specific content is absent**
+- [x] **Step 3: Verify smoke-specific content is absent**
 
 Run:
 
@@ -51,7 +51,7 @@ Expected: no output and exit status 1.
 **Files:**
 - Verify: `docs/self_steering_experiment_guide.md`
 
-- [ ] **Step 1: Verify both formal workflows remain**
+- [x] **Step 1: Verify both formal workflows remain**
 
 Run:
 
@@ -61,7 +61,7 @@ rg -n "默认：只评测 MATH500|扩展到 MATH500 和 AIME|00_prepare_data.py|
 
 Expected: both formal headings and the first/last pipeline commands are present.
 
-- [ ] **Step 2: Verify Markdown diff and project tests**
+- [x] **Step 2: Verify Markdown diff and project tests**
 
 Run:
 
@@ -72,7 +72,7 @@ pytest -q
 
 Expected: no whitespace errors and no test failures; the real Qwen test may be explicitly skipped on the current workstation.
 
-- [ ] **Step 3: Commit the change**
+- [x] **Step 3: Commit the change**
 
 ```bash
 git add docs/self_steering_experiment_guide.md docs/superpowers/plans/2026-09-02-formal-experiment-guide-only.md

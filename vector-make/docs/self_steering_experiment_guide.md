@@ -1,6 +1,6 @@
 # Self-Steering MVP 实验运行指南
 
-本文面向准备在服务器上运行实验的使用者，重点说明 `scripts/00` 到 `scripts/07` 分别做什么、对应哪些核心代码、需要设置哪些超参数，以及如何先做小规模检查再运行正式实验。
+本文面向准备在服务器上运行实验的使用者，重点说明 `scripts/00` 到 `scripts/07` 分别做什么、对应哪些核心代码、需要设置哪些超参数，以及如何运行真实数据正式实验。
 
 命令默认从 `vector-make` 目录执行。
 
@@ -389,7 +389,7 @@ outputs/metrics/<steering_run_id>_steering_metrics.csv
 | `device_map` | `auto` | Transformers 设备分配；单卡显存不足时可自动切分。 |
 | `attention_implementation` | `sdpa` | 注意力实现；服务器依赖不支持时可修改或移除。 |
 | `trust_remote_code` | `false` | Qwen2.5 当前无需开启。 |
-| `max_new_tokens` | `2048` | stage 06 最大生成长度；smoke test 建议降到 128–512。 |
+| `max_new_tokens` | `2048` | stage 06 最大生成长度；可按任务所需的推理和答案长度调整。 |
 | `do_sample` | `false` | 当前 generation 代码固定为 greedy；修改此 YAML 不会开启采样。 |
 | `use_cache` | `true` | 当前 generation 代码固定使用 cache；修改此 YAML 不会关闭 cache。 |
 
@@ -432,57 +432,9 @@ MMLU 始终作为 extraction 数据集，不写入 `enabled_steering_datasets`�
 | `paths.data_dir` | `data` | processed/scored 数据根目录。 |
 | `paths.outputs_dir` | `outputs` | activations/vectors/generations/metrics/manifests 根目录。 |
 
-## 6. 小规模 smoke test
+## 6. 正式实验命令
 
-建议使用独立目录，避免和正式实验产物混在一起：
-
-```bash
-BASE_CONFIG=(
-  --config configs/model.yaml
-  --config configs/data.yaml
-  --config configs/experiment.yaml
-)
-
-SMOKE=(
-  --override experiment.paths.data_dir=data_smoke
-  --override experiment.paths.outputs_dir=outputs_smoke
-  --override model.max_new_tokens=128
-  --override 'experiment.alphas=[0.0,1.0]'
-)
-```
-
-先准备和标注少量题。建议从每个数据集 20 题起步：
-
-```bash
-python scripts/00_prepare_data.py "${BASE_CONFIG[@]}" "${SMOKE[@]}" --limit 20
-python scripts/01_score_demands.py "${BASE_CONFIG[@]}" "${SMOKE[@]}" --limit 20
-python scripts/02_prepare_items.py "${BASE_CONFIG[@]}" "${SMOKE[@]}"
-```
-
-首次运行默认约产生 `(20 MMLU + 20 MATH500) × 4 = 160` 次 annotation 请求。完成后检查：
-
-```bash
-wc -l data_smoke/processed/extraction/*.jsonl
-wc -l data_smoke/processed/evaluation/math500.jsonl
-```
-
-要求四个 extraction 文件都至少有 2 行，并且 evaluation 文件非空。如果不满足，提高 stage 00/01 的 limit 后重跑；annotation JSONL 会复用已有成功记录。
-
-随后只对每个 capability 和评测集使用前 2 题进行 GPU smoke：
-
-```bash
-python scripts/03_capture_contrasts.py "${BASE_CONFIG[@]}" "${SMOKE[@]}" --limit 2
-python scripts/04_extract_vectors.py "${BASE_CONFIG[@]}" "${SMOKE[@]}"
-python scripts/05_analyze_similarity.py "${BASE_CONFIG[@]}" "${SMOKE[@]}"
-python scripts/06_run_steering.py "${BASE_CONFIG[@]}" "${SMOKE[@]}" --limit 2
-python scripts/07_score_generations.py "${BASE_CONFIG[@]}" "${SMOKE[@]}"
-```
-
-这仍然不是轻量 mock：stage 01 会真实调用 OpenAI API，stage 03 和 06 会真实加载 Qwen2.5-7B-Instruct。
-
-## 7. 正式实验命令
-
-### 7.1 默认：只评测 MATH500
+### 6.1 默认：只评测 MATH500
 
 ```bash
 python scripts/00_prepare_data.py "${BASE_CONFIG[@]}"
@@ -495,7 +447,7 @@ python scripts/06_run_steering.py "${BASE_CONFIG[@]}"
 python scripts/07_score_generations.py "${BASE_CONFIG[@]}"
 ```
 
-### 7.2 扩展到 MATH500 和 AIME 2024/2025/2026
+### 6.2 扩展到 MATH500 和 AIME 2024/2025/2026
 
 ```bash
 EVALS=(
@@ -514,7 +466,7 @@ python scripts/07_score_generations.py "${BASE_CONFIG[@]}" "${EVALS[@]}"
 
 如需 ARC-C 和 OBQA，可继续追加 `arc_c,obqa`。启用更多数据集意味着 stage 01 会为这些数据集的每道题增加四次 API 标注，并显著增加 stage 06 的生成量。
 
-## 8. 如何检查运行结果
+## 7. 如何检查运行结果
 
 ### 数据和标注
 
@@ -549,7 +501,7 @@ outputs/manifests/<stage>/<run_id>.json
 
 其中包含 resolved config、文件哈希、seed、prompt/rubric hash、包版本和可获得的模型/tokenizer commit，用于核对实验身份。
 
-## 9. 参数变化后从哪里重跑
+## 8. 参数变化后从哪里重跑
 
 | 变化 | 建议起始阶段 | 原因 |
 |---|---:|---|
@@ -564,7 +516,7 @@ outputs/manifests/<stage>/<run_id>.json
 | max_workers、retry、backoff | 01 | 已成功标注仍会恢复，只影响未完成调用。 |
 | data/output path | 对新目录从最早所需阶段开始 | 新目录不会自动引用旧目录产物。 |
 
-## 10. 常见问题
+## 9. 常见问题
 
 ### Stage 04 报某个 capability 没有 activation shards
 
