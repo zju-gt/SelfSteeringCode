@@ -1,4 +1,4 @@
-"""One-item, one-dimension DeLeAn annotation through Responses API."""
+"""One-item, one-dimension DeLeAn annotation through Chat Completions."""
 
 from __future__ import annotations
 
@@ -63,7 +63,11 @@ Rules:
 - Follow the rubric literally.
 - Map the highest 5+ category to score 5.
 - Return an integer score from 0 to 5.
-- Give a short justification."""
+- Give a short justification.
+
+Return only valid JSON with exactly these fields:
+{{"score": <integer 0-5>, "brief_justification": "<short justification>"}}
+Do not use Markdown fences or include any other text."""
 
 
 def _annotation_contract_hash(prompt: str) -> str:
@@ -118,19 +122,17 @@ def label_one_dimension(
         sort_keys=True,
         separators=(",", ":"),
     )
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=model,
-        input=prompt,
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "delean_annotation",
-                "strict": True,
-                "schema": ANNOTATION_SCHEMA,
-            }
-        },
+        messages=[{"role": "user", "content": prompt}],
     )
-    parsed = json.loads(response.output_text)
+    choices = getattr(response, "choices", None)
+    if not choices:
+        raise ValueError("annotator returned no completion choices")
+    content = getattr(getattr(choices[0], "message", None), "content", None)
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("annotator returned empty completion content")
+    parsed = json.loads(content)
     score = parsed.get("score")
     justification = parsed.get("brief_justification")
     if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 5:

@@ -3,12 +3,25 @@ from pathlib import Path
 from _common import build_parser, print_paths, resolved_config
 
 
+ANNOTATION_BASE_URL = "https://newapi.metamind.work/v1"
+ANNOTATION_API_KEY = "sk-xxx"
+
+
+def build_annotation_client(openai_class=None):
+    if openai_class is None:
+        from openai import OpenAI
+
+        openai_class = OpenAI
+    return openai_class(
+        base_url=ANNOTATION_BASE_URL,
+        api_key=ANNOTATION_API_KEY,
+    )
+
+
 def main() -> None:
     parser = build_parser("Score four DeLeAn demand dimensions")
     args = parser.parse_args()
     config = resolved_config(args)
-
-    from openai import OpenAI
 
     from self_steering.datasets.delean_labeler import (
         AnnotationRequest,
@@ -21,7 +34,7 @@ def main() -> None:
     annotation = config["experiment"]["annotation"]
     model = str(annotation["model"])
     rubric_dir = Path(config["experiment"]["paths"].get("rubrics_dir", "rubrics"))
-    client = OpenAI()
+    client = build_annotation_client()
     rubrics = {
         dimension: (rubric_dir / f"{dimension}.txt").read_text(encoding="utf-8")
         for dimension in config["experiment"]["capabilities"]

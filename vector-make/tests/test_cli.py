@@ -1,4 +1,5 @@
 import os
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -106,3 +107,17 @@ experiment:
 
     assert config["model"]["name"] == "custom-model"
     assert "cache_dir" not in config["model"]
+
+
+def test_score_demands_builds_metamind_client() -> None:
+    script = runpy.run_path(str(SCRIPTS_DIR / "01_score_demands.py"))
+    captured = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    script["build_annotation_client"](FakeOpenAI)
+
+    assert captured["base_url"] == "https://newapi.metamind.work/v1"
+    assert captured["api_key"].startswith("sk-")

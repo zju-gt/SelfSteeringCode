@@ -23,11 +23,17 @@ from self_steering.datasets.types import CanonicalItem
 from self_steering.utils.io import read_jsonl
 
 
-class FakeResponses:
+class FakeChatCompletions:
     def create(self, **kwargs):
         self.kwargs = kwargs
         return SimpleNamespace(
-            output_text='{"score":4,"brief_justification":"multi-step"}',
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"score":4,"brief_justification":"multi-step"}'
+                    )
+                )
+            ],
             id="resp_1",
             model="judge-returned",
         )
@@ -36,8 +42,10 @@ class FakeResponses:
 def test_label_one_dimension_returns_hashed_audit_record(tmp_path: Path) -> None:
     rubric = tmp_path / "QLl.txt"
     rubric.write_text("rubric", encoding="utf-8")
-    responses = FakeResponses()
-    client = SimpleNamespace(responses=responses)
+    completions = FakeChatCompletions()
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=completions),
+    )
     row = label_one_dimension(
         client,
         AnnotationRequest(
@@ -57,7 +65,8 @@ def test_label_one_dimension_returns_hashed_audit_record(tmp_path: Path) -> None
     assert len(row["rubric_sha256"]) == 64
     assert len(row["annotation_prompt_sha256"]) == 64
     assert len(row["annotation_schema_sha256"]) == 64
-    assert responses.kwargs["text"]["format"]["strict"] is True
+    assert completions.kwargs["messages"][0]["role"] == "user"
+    assert "Return only valid JSON" in completions.kwargs["messages"][0]["content"]
 
 
 def test_annotation_key_changes_when_task_hash_changes() -> None:
