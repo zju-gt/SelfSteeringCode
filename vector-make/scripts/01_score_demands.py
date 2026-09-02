@@ -4,7 +4,7 @@ from _common import build_parser, print_paths, resolved_config
 
 
 ANNOTATION_BASE_URL = "https://newapi.metamind.work/v1"
-ANNOTATION_API_KEY = "sk-xxx"
+ANNOTATION_API_KEY = "sk-ifvPqXKUxGprBuTBQwaXt9zXKiC0myucjSmGtG4omk0sjS27"
 
 
 def build_annotation_client(openai_class=None):
