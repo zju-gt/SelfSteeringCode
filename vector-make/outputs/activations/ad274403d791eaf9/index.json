@@ -1,0 +1,21 @@
+{
+  "capture_artifact_id": "ad274403d791eaf9",
+  "shards": {
+    "CL": [
+      "CL/mmlu_high_school_european_history_validation_00362__ccd0e5845383.safetensors",
+      "CL/mmlu_high_school_european_history_validation_00368__7d9e85165abe.safetensors"
+    ],
+    "MCr": [
+      "MCr/mmlu_abstract_algebra_validation_00008__022cf0e0194f.safetensors",
+      "MCr/mmlu_abstract_algebra_validation_00010__cf03ac5a96fc.safetensors"
+    ],
+    "QLl": [
+      "QLl/mmlu_abstract_algebra_validation_00006__71ff6c30fe03.safetensors",
+      "QLl/mmlu_abstract_algebra_validation_00007__a52fa418987a.safetensors"
+    ],
+    "QLq": [
+      "QLq/mmlu_abstract_algebra_validation_00003__4d2edfaf6d4d.safetensors",
+      "QLq/mmlu_abstract_algebra_validation_00008__022cf0e0194f.safetensors"
+    ]
+  }
+}
