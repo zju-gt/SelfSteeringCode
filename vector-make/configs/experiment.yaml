@@ -5,7 +5,7 @@ experiment:
     - CL
     - MCr
   target_layer: 19
-  high_demand_threshold: 4
+  high_demand_threshold: 3
   low_demand_threshold: 1
   vector_scaling: mean_norm
   alphas:

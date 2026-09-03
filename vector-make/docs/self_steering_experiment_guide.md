@@ -191,13 +191,13 @@ python scripts/02_prepare_items.py
 MMLU 用于向量提取。对 capability `k`，默认选取：
 
 ```text
-d_k >= high_demand_threshold = 4
+d_k >= high_demand_threshold = 3
 ```
 
 外部评测集会记录每道题属于哪些 high/low demand slice：
 
 ```text
-high: d_k >= 4
+high: d_k >= 3
 low:  d_k <= 1
 ```
 
@@ -423,7 +423,7 @@ MMLU 始终作为 extraction 数据集，不写入 `enabled_steering_datasets`�
 |---|---|---|
 | `capabilities` | `QLl, QLq, CL, MCr` | MVP 固定要求四项齐全且不重复，不支持只选子集。 |
 | `target_layer` | `19` | 零基 decoder layer；必须小于 `num_hidden_layers`。 |
-| `high_demand_threshold` | `4` | MMLU extraction 和 high evaluation slice 的下限。 |
+| `high_demand_threshold` | `3` | MMLU extraction 和 high evaluation slice 的下限。 |
 | `low_demand_threshold` | `1` | low evaluation slice 的上限；必须小于 high threshold。 |
 | `vector_scaling` | `mean_norm` | `raw/unit/mean_norm`；只改变注入形式时可从 stage 06 重跑。 |
 | `alphas` | `[-1,-0.5,0,0.5,1]` | 必须有限、唯一并包含 0；范围可在 pilot 后调整。 |
