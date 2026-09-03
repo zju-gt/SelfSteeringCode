@@ -3,7 +3,10 @@
 import pytest
 import torch
 
-from self_steering.models.generation import generate_with_optional_steering
+from self_steering.models.generation import (
+    generate_batch_with_optional_steering,
+    generate_with_optional_steering,
+)
 
 
 class DecodeOnlyTokenizer:
@@ -70,3 +73,45 @@ def test_real_qwen2_generate_uses_cached_single_token_decode_with_steering() -> 
     assert isinstance(text, str)
     assert sequence_lengths[0] == 3
     assert sequence_lengths[1:] == [1]
+
+
+def test_real_qwen2_generate_supports_left_padded_batches() -> None:
+    Qwen2Config, Qwen2ForCausalLM = _qwen_classes()
+    config = Qwen2Config(
+        vocab_size=64,
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        num_key_value_heads=2,
+        max_position_embeddings=64,
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=None,
+    )
+    try:
+        model = Qwen2ForCausalLM(config).eval()
+    except Exception as error:
+        pytest.skip(
+            "installed Transformers/Torch environment cannot initialize Qwen2: "
+            f"{type(error).__name__}: {error}"
+        )
+    sequence_lengths: list[int] = []
+    handle = model.model.layers[0].register_forward_pre_hook(
+        lambda module, args: sequence_lengths.append(int(args[0].shape[1]))
+    )
+    try:
+        texts = generate_batch_with_optional_steering(
+            model,
+            DecodeOnlyTokenizer(),
+            [torch.tensor([[1, 2, 3]]), torch.tensor([[1, 2]])],
+            model.model.layers[0],
+            vector=torch.ones(config.hidden_size),
+            alpha=0.25,
+            max_new_tokens=1,
+        )
+    finally:
+        handle.remove()
+
+    assert len(texts) == 2
+    assert sequence_lengths == [3]

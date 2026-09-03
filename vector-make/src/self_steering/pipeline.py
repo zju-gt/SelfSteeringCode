@@ -27,7 +27,7 @@ from self_steering.evaluation.metrics import (
     paired_alpha_rows,
     specificity_report,
 )
-from self_steering.models.generation import generate_with_optional_steering
+from self_steering.models.generation import generate_batch_with_optional_steering
 from self_steering.models.loader import resolve_decoder_layer
 from self_steering.prompts.serialization import (
     answer_instruction,
@@ -564,122 +564,194 @@ def run_steering(config: dict, model: Any, tokenizer: Any) -> Path:
     }
     capabilities = list(config["experiment"]["capabilities"])
     alphas = list(config["experiment"]["alphas"])
-    evaluation_sets = [
-        (
-            dataset,
-            _limit(
-                config,
-                list(
-                    read_jsonl(
-                        data_dir / "processed" / "evaluation" / f"{dataset}.jsonl"
-                    )
-                ),
+    max_new_tokens = int(config["model"].get("max_new_tokens", 2048))
+    batch_size = int(
+        config["experiment"].get("generation", {}).get("batch_size", 1)
+    )
+    contexts: list[tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor]] = []
+    for dataset in config["data"].get("enabled_steering_datasets", []):
+        rows = _limit(
+            config,
+            list(
+                read_jsonl(data_dir / "processed" / "evaluation" / f"{dataset}.jsonl")
             ),
         )
-        for dataset in config["data"].get("enabled_steering_datasets", [])
-    ]
-    total = sum(len(rows) * len(capabilities) * len(alphas) for _, rows in evaluation_sets)
-    resumed = min(len(completed), total)
+        for row in rows:
+            item = CanonicalItem.from_dict(row)
+            contexts.append(
+                (
+                    dataset,
+                    row,
+                    item,
+                    _tensor_input(
+                        serialize_reasoning_prefill(
+                            tokenizer,
+                            GENERIC_PROMPT,
+                            item.prompt,
+                            answer_instruction(item.answer_type, item.dataset),
+                        )
+                    ),
+                )
+            )
+
+    def record_for(
+        context: tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor],
+        capability: str,
+        alpha: float,
+    ) -> tuple[dict[str, Any], tuple[str, str, str, float]]:
+        dataset, source_row, item, _ = context
+        record = generation_identity_record(
+            run_id=run_id,
+            dataset=dataset,
+            item=item,
+            source_row=source_row,
+            steering_capability=capability,
+            alpha=alpha,
+        )
+        record.update(
+            {
+                "capture_artifact_id": capture_id,
+                "vector_sha256": vector_sha256,
+                "vector_scaling": scaling,
+                "model_revision": config["model"].get("revision"),
+                "model_resolution": _resolved_model_identity(model, tokenizer),
+                "generation_parameters": {
+                    "max_new_tokens": max_new_tokens,
+                    "batch_size": batch_size,
+                    "do_sample": bool(config["model"].get("do_sample", False)),
+                    "use_cache": bool(config["model"].get("use_cache", True)),
+                },
+            }
+        )
+        return record, generation_key(record)
+
+    expected = {
+        key
+        for context in contexts
+        for capability in capabilities
+        for raw_alpha in alphas
+        for _, key in [record_for(context, capability, float(raw_alpha))]
+    }
+    completed &= expected
+    total = len(expected)
+    resumed = len(completed)
     failures = 0
     progress = tqdm(total=total, initial=resumed, desc=output_path.stem)
+
+    def persist(
+        context: tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor],
+        record: dict[str, Any],
+        key: tuple[str, str, str, float],
+        *,
+        output: str | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        nonlocal failures
+        _, _, item, _ = context
+        try:
+            if error is not None:
+                raise error
+            assert output is not None
+            predicted = extract_answer(output, item.answer_type)
+            persisted = {
+                **record,
+                "raw_output": output,
+                "predicted_answer": predicted,
+                "correct": is_correct(
+                    predicted,
+                    item.gold_answer,
+                    dataset=item.dataset,
+                    answer_type=item.answer_type,
+                ),
+                "status": "ok",
+            }
+        except Exception as caught:
+            persisted = _operation_error_record(
+                caught,
+                **record,
+                stage="run_steering",
+                target_layer=int(config["experiment"]["target_layer"]),
+            )
+        append_jsonl(output_path, persisted)
+        if persisted["status"] == "ok":
+            completed.add(key)
+        else:
+            failures += 1
+        progress.update(1)
+        progress.set_postfix(resumed=resumed, failed=failures)
+
+    def batches(values: list[Any]) -> list[list[Any]]:
+        return [values[index : index + batch_size] for index in range(0, len(values), batch_size)]
+
     try:
-        for dataset, rows in evaluation_sets:
-            for row in rows:
-                item = CanonicalItem.from_dict(row)
-                final_instruction = answer_instruction(item.answer_type, item.dataset)
-                input_ids = _tensor_input(
-                    serialize_reasoning_prefill(
-                        tokenizer,
-                        GENERIC_PROMPT,
-                        item.prompt,
-                        final_instruction,
-                    )
+        baseline_tasks: list[
+            tuple[
+                tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor],
+                list[tuple[dict[str, Any], tuple[str, str, str, float]]],
+            ]
+        ] = []
+        for context in contexts:
+            pending = []
+            for capability in capabilities:
+                record, key = record_for(context, capability, 0.0)
+                if key not in completed:
+                    pending.append((record, key))
+            if not pending:
+                continue
+            cache_key = pending[0][1][:2]
+            if cache_key in baseline_cache:
+                for record, key in pending:
+                    persist(context, record, key, output=baseline_cache[cache_key])
+            else:
+                baseline_tasks.append((context, pending))
+        for batch in batches(baseline_tasks):
+            try:
+                outputs = generate_batch_with_optional_steering(
+                    model,
+                    tokenizer,
+                    [context[3] for context, _ in batch],
+                    layer,
+                    vector=None,
+                    alpha=0.0,
+                    max_new_tokens=max_new_tokens,
                 )
-                for capability in capabilities:
-                    for raw_alpha in alphas:
-                        alpha = float(raw_alpha)
-                        key_record = generation_identity_record(
-                            run_id=run_id,
-                            dataset=dataset,
-                            item=item,
-                            source_row=row,
-                            steering_capability=capability,
+            except Exception as error:
+                for context, pending in batch:
+                    for record, key in pending:
+                        persist(context, record, key, error=error)
+                continue
+            for (context, pending), output in zip(batch, outputs, strict=True):
+                baseline_cache[pending[0][1][:2]] = output
+                for record, key in pending:
+                    persist(context, record, key, output=output)
+
+        for capability in capabilities:
+            for raw_alpha in alphas:
+                alpha = float(raw_alpha)
+                if alpha == 0.0:
+                    continue
+                pending = []
+                for context in contexts:
+                    record, key = record_for(context, capability, alpha)
+                    if key not in completed:
+                        pending.append((context, record, key))
+                for batch in batches(pending):
+                    try:
+                        outputs = generate_batch_with_optional_steering(
+                            model,
+                            tokenizer,
+                            [context[3] for context, _, _ in batch],
+                            layer,
+                            vector=vectors[capability][form],
                             alpha=alpha,
+                            max_new_tokens=max_new_tokens,
                         )
-                        key_record.update(
-                            {
-                                "capture_artifact_id": capture_id,
-                                "vector_sha256": vector_sha256,
-                                "vector_scaling": scaling,
-                                "model_revision": config["model"].get("revision"),
-                                "model_resolution": _resolved_model_identity(
-                                    model, tokenizer
-                                ),
-                                "generation_parameters": {
-                                    "max_new_tokens": int(
-                                        config["model"].get("max_new_tokens", 2048)
-                                    ),
-                                    "do_sample": bool(
-                                        config["model"].get("do_sample", False)
-                                    ),
-                                    "use_cache": bool(
-                                        config["model"].get("use_cache", True)
-                                    ),
-                                },
-                            }
-                        )
-                        key = generation_key(key_record)
-                        if key in completed:
-                            continue
-                        cache_key = key[:2]
-                        try:
-                            if alpha == 0.0 and cache_key in baseline_cache:
-                                output = baseline_cache[cache_key]
-                            else:
-                                output = generate_with_optional_steering(
-                                    model,
-                                    tokenizer,
-                                    input_ids,
-                                    layer,
-                                    vector=(
-                                        None
-                                        if alpha == 0.0
-                                        else vectors[capability][form]
-                                    ),
-                                    alpha=alpha,
-                                    max_new_tokens=int(
-                                        config["model"].get("max_new_tokens", 2048)
-                                    ),
-                                )
-                                if alpha == 0.0:
-                                    baseline_cache[cache_key] = output
-                            predicted = extract_answer(output, item.answer_type)
-                            persisted = {
-                                **key_record,
-                                "raw_output": output,
-                                "predicted_answer": predicted,
-                                "correct": is_correct(
-                                    predicted,
-                                    item.gold_answer,
-                                    dataset=dataset,
-                                    answer_type=item.answer_type,
-                                ),
-                                "status": "ok",
-                            }
-                        except Exception as error:
-                            persisted = _operation_error_record(
-                                error,
-                                **key_record,
-                                stage="run_steering",
-                                target_layer=int(config["experiment"]["target_layer"]),
-                            )
-                        append_jsonl(output_path, persisted)
-                        if persisted["status"] == "ok":
-                            completed.add(key)
-                        else:
-                            failures += 1
-                        progress.update(1)
-                        progress.set_postfix(resumed=resumed, failed=failures)
+                    except Exception as error:
+                        for context, record, key in batch:
+                            persist(context, record, key, error=error)
+                        continue
+                    for (context, record, key), output in zip(batch, outputs, strict=True):
+                        persist(context, record, key, output=output)
     finally:
         progress.close()
     _write_manifest(

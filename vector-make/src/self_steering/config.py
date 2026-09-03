@@ -183,6 +183,17 @@ def validate_config(config: dict[str, Any]) -> None:
     ):
         raise ConfigError("model.max_new_tokens must be a positive integer")
 
+    generation = experiment.get("generation", {})
+    if not isinstance(generation, dict):
+        raise ConfigError("experiment.generation must be a mapping")
+    batch_size = generation.get("batch_size", 1)
+    if (
+        not isinstance(batch_size, int)
+        or isinstance(batch_size, bool)
+        or batch_size <= 0
+    ):
+        raise ConfigError("experiment.generation.batch_size must be a positive integer")
+
     annotation = experiment.get("annotation", {})
     if not isinstance(annotation, dict):
         raise ConfigError("experiment.annotation must be a mapping")

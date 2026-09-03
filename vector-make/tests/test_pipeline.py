@@ -398,8 +398,8 @@ def test_run_steering_reports_resumed_generation_progress(
 
     monkeypatch.setattr("self_steering.pipeline.tqdm", FakeProgress, raising=False)
     monkeypatch.setattr(
-        "self_steering.pipeline.generate_with_optional_steering",
-        lambda *args, **kwargs: r"\boxed{1}",
+        "self_steering.pipeline.generate_batch_with_optional_steering",
+        lambda *args, **kwargs: [r"\boxed{1}" for _ in args[2]],
     )
 
     run_steering(config, FailingGenerationModel(), MinimalTokenizer())
@@ -412,3 +412,54 @@ def test_run_steering_reports_resumed_generation_progress(
     assert progress_instances[1].kwargs["initial"] == 4
     assert progress_instances[1].updates == []
     assert progress_instances[1].closed
+
+
+def test_run_steering_batches_matching_capability_alpha_work(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = base_config(tmp_path)
+    config["experiment"]["generation"] = {"batch_size": 2}
+    evaluation = tmp_path / "data" / "processed" / "evaluation"
+    evaluation.mkdir(parents=True)
+    write_jsonl(
+        evaluation / "math500.jsonl",
+        [
+            dict(
+                CanonicalItem(item_id, "math500", "test", "q", "1", "math").to_dict(),
+                demand_memberships={"QLl": "high"},
+            )
+            for item_id in ("x1", "x2")
+        ],
+    )
+    vector_root = tmp_path / "outputs" / "vectors" / capture_artifact_id(config)
+    vectors = {
+        capability: {
+            "raw": torch.ones(2),
+            "unit": torch.ones(2),
+            "steering": torch.ones(2),
+        }
+        for capability in config["experiment"]["capabilities"]
+    }
+    save_vector_library(
+        vector_root / "capability_vectors.safetensors",
+        vector_root / "capability_vectors.json",
+        vectors,
+        metadata={},
+    )
+    batch_sizes = []
+
+    def generate_batch(*args, **kwargs):
+        inputs = args[2]
+        batch_sizes.append(len(inputs))
+        return [r"\boxed{1}" for _ in inputs]
+
+    monkeypatch.setattr(
+        "self_steering.pipeline.generate_batch_with_optional_steering",
+        generate_batch,
+        raising=False,
+    )
+
+    output = run_steering(config, FailingGenerationModel(), MinimalTokenizer())
+
+    assert batch_sizes == [2, 2, 2]
+    assert len(list(read_jsonl(output))) == 8

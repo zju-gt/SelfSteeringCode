@@ -2,7 +2,10 @@ import pytest
 import torch
 from torch import nn
 
-from self_steering.models.generation import generate_with_optional_steering
+from self_steering.models.generation import (
+    generate_batch_with_optional_steering,
+    generate_with_optional_steering,
+)
 from self_steering.models.loader import resolve_decoder_layer
 
 
@@ -44,7 +47,9 @@ class FakeGenerateModel:
 
     def generate(self, **kwargs):
         self.kwargs = kwargs
-        suffix = torch.tensor([[7, 8]], device=kwargs["input_ids"].device)
+        suffix = torch.tensor([[7, 8]], device=kwargs["input_ids"].device).repeat(
+            kwargs["input_ids"].shape[0], 1
+        )
         return torch.cat([kwargs["input_ids"], suffix], dim=1)
 
 
@@ -65,3 +70,21 @@ def test_generation_is_greedy_and_decodes_only_new_tokens() -> None:
     assert tokenizer.decoded.tolist() == [7, 8]
     assert model.kwargs["do_sample"] is False
     assert model.kwargs["use_cache"] is True
+
+
+def test_batch_generation_left_pads_variable_length_prompts() -> None:
+    model = FakeGenerateModel()
+    tokenizer = FakeTokenizer()
+    texts = generate_batch_with_optional_steering(
+        model,
+        tokenizer,
+        [torch.tensor([[1, 2, 3]]), torch.tensor([[4, 5]])],
+        nn.Identity(),
+        vector=None,
+        alpha=0.0,
+        max_new_tokens=10,
+    )
+
+    assert texts == ["generated text", "generated text"]
+    assert model.kwargs["input_ids"].tolist() == [[1, 2, 3], [99, 4, 5]]
+    assert model.kwargs["attention_mask"].tolist() == [[1, 1, 1], [0, 1, 1]]

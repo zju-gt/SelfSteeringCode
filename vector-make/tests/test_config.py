@@ -123,6 +123,10 @@ def test_load_config_rejects_unknown_dataset(tmp_path: Path) -> None:
         (lambda config: config["experiment"].update(alphas=[0, 1, 1]), "unique"),
         (lambda config: config["experiment"].update(alphas=[0, float("inf")]), "finite"),
         (lambda config: config["model"].update(max_new_tokens=0), "max_new_tokens"),
+        (
+            lambda config: config["experiment"].update(generation={"batch_size": 0}),
+            "batch_size",
+        ),
         (lambda config: config["model"].update(revision="main"), "revision"),
         (
             lambda config: config["experiment"]["annotation"].update(max_workers=0),

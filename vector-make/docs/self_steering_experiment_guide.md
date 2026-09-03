@@ -351,9 +351,9 @@ use_cache = True
 outputs/generations/<steering_run_id>.jsonl
 ```
 
-成功行包含 run/vector/model/generation 参数和正确性；失败行包含完整 item/capability/alpha 身份。CUDA OOM 会标记为 `error_type: cuda_oom`。重跑时只跳过相同身份的最新成功行，失败项会再次执行。终端进度条会从已恢复的成功记录数开始，并显示本轮失败数；每一条 generation 会立即追加并同步到 JSONL 文件。
+成功行包含 run/vector/model/generation 参数和正确性；失败行包含完整 item/capability/alpha 身份。CUDA OOM 会标记为 `error_type: cuda_oom`。同一 capability 和 alpha 的题目会以 `generation.batch_size` 左填充组 batch 后生成，以提高 GPU 利用率。重跑时只跳过相同身份的最新成功行，失败项会再次执行；改变 batch size 不会使已有成功 generation 失效。终端进度条会从已恢复的成功记录数开始，并显示本轮失败数；每个 batch 完成后会立即逐条追加并同步到 JSONL 文件。
 
-重点参数：`vector_scaling`、`alphas`、`max_new_tokens`、`target_layer`、enabled datasets 和 `--limit`。
+重点参数：`vector_scaling`、`alphas`、`max_new_tokens`、`generation.batch_size`、`target_layer`、enabled datasets 和 `--limit`。
 
 ### 4.8 Stage 07：计算评测指标
 
@@ -427,6 +427,7 @@ MMLU 始终作为 extraction 数据集，不写入 `enabled_steering_datasets`�
 | `low_demand_threshold` | `1` | low evaluation slice 的上限；必须小于 high threshold。 |
 | `vector_scaling` | `mean_norm` | `raw/unit/mean_norm`；只改变注入形式时可从 stage 06 重跑。 |
 | `alphas` | `[-1,-0.5,0,0.5,1]` | 必须有限、唯一并包含 0；范围可在 pilot 后调整。 |
+| `generation.batch_size` | `4` | stage 06 每次同一 capability/alpha 的生成 batch 大小。显存充足时可尝试 8 或 16；OOM 时调低。 |
 | `seed` | `42` | 模型阶段统一设置 Python/PyTorch seed；当前 greedy 主流程基本确定。 |
 | `annotation.model` | `gpt-5.6-terra` | DeLeAn 标注模型；改变后 stage 01 会生成新的标注身份。 |
 | `annotation.max_workers` | `8` | API 并发；遇到 429 或连接压力时降低。 |
@@ -532,7 +533,7 @@ outputs/manifests/<stage>/<run_id>.json
 
 ### Stage 06 CUDA OOM
 
-generation OOM 时可先降低 `model.max_new_tokens`；同时检查 GPU 是否被其他任务占用。stage 03 的单题 capture OOM 通常需要更多显存、调整 device map/dtype，或减少单题 prompt 长度；仅降低题目数量不会降低单题峰值显存。
+generation OOM 时先降低 `experiment.generation.batch_size`，然后再考虑降低 `model.max_new_tokens`；同时检查 GPU 是否被其他任务占用。stage 03 的单题 capture OOM 通常需要更多显存、调整 device map/dtype，或减少单题 prompt 长度；仅降低题目数量不会降低单题峰值显存。
 
 ### Stage 07 找不到 generation 文件
 
