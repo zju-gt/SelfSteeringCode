@@ -351,7 +351,7 @@ use_cache = True
 outputs/generations/<steering_run_id>.jsonl
 ```
 
-成功行包含 run/vector/model/generation 参数和正确性；失败行包含完整 item/capability/alpha 身份。CUDA OOM 会标记为 `error_type: cuda_oom`。重跑时只跳过相同身份的最新成功行，失败项会再次执行。
+成功行包含 run/vector/model/generation 参数和正确性；失败行包含完整 item/capability/alpha 身份。CUDA OOM 会标记为 `error_type: cuda_oom`。重跑时只跳过相同身份的最新成功行，失败项会再次执行。终端进度条会从已恢复的成功记录数开始，并显示本轮失败数；每一条 generation 会立即追加并同步到 JSONL 文件。
 
 重点参数：`vector_scaling`、`alphas`、`max_new_tokens`、`target_layer`、enabled datasets 和 `--limit`。
 

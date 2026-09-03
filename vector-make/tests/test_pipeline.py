@@ -346,3 +346,69 @@ def test_run_steering_records_cuda_oom_for_each_generation(tmp_path: Path) -> No
     assert {row["status"] for row in rows} == {"error"}
     assert {row["error_type"] for row in rows} == {"cuda_oom"}
     assert all(row["item_identity"] for row in rows)
+
+
+def test_run_steering_reports_resumed_generation_progress(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = base_config(tmp_path)
+    evaluation = tmp_path / "data" / "processed" / "evaluation"
+    evaluation.mkdir(parents=True)
+    write_jsonl(
+        evaluation / "math500.jsonl",
+        [
+            dict(
+                CanonicalItem("x", "math500", "test", "q", "1", "math").to_dict(),
+                demand_memberships={"QLl": "high"},
+            )
+        ],
+    )
+    vector_root = tmp_path / "outputs" / "vectors" / capture_artifact_id(config)
+    vectors = {
+        capability: {
+            "raw": torch.ones(2),
+            "unit": torch.ones(2),
+            "steering": torch.ones(2),
+        }
+        for capability in config["experiment"]["capabilities"]
+    }
+    save_vector_library(
+        vector_root / "capability_vectors.safetensors",
+        vector_root / "capability_vectors.json",
+        vectors,
+        metadata={},
+    )
+    progress_instances = []
+
+    class FakeProgress:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.updates = []
+            self.closed = False
+            progress_instances.append(self)
+
+        def update(self, amount):
+            self.updates.append(amount)
+
+        def set_postfix(self, **kwargs):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr("self_steering.pipeline.tqdm", FakeProgress, raising=False)
+    monkeypatch.setattr(
+        "self_steering.pipeline.generate_with_optional_steering",
+        lambda *args, **kwargs: r"\boxed{1}",
+    )
+
+    run_steering(config, FailingGenerationModel(), MinimalTokenizer())
+    run_steering(config, FailingGenerationModel(), MinimalTokenizer())
+
+    assert progress_instances[0].kwargs["total"] == 4
+    assert progress_instances[0].kwargs["initial"] == 0
+    assert progress_instances[0].updates == [1, 1, 1, 1]
+    assert progress_instances[0].closed
+    assert progress_instances[1].kwargs["initial"] == 4
+    assert progress_instances[1].updates == []
+    assert progress_instances[1].closed

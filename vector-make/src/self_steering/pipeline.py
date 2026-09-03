@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping
 
 import torch
 from safetensors.torch import load_file
+from tqdm.auto import tqdm
 
 from self_steering.datasets.filtering import demand_memberships, demand_slice
 from self_steering.datasets.registry import DatasetRegistry
@@ -561,100 +562,126 @@ def run_steering(config: dict, model: Any, tokenizer: Any) -> Path:
         for row in current_existing
         if float(row["alpha"]) == 0.0
     }
-    for dataset in config["data"].get("enabled_steering_datasets", []):
-        rows = list(
-            read_jsonl(data_dir / "processed" / "evaluation" / f"{dataset}.jsonl")
+    capabilities = list(config["experiment"]["capabilities"])
+    alphas = list(config["experiment"]["alphas"])
+    evaluation_sets = [
+        (
+            dataset,
+            _limit(
+                config,
+                list(
+                    read_jsonl(
+                        data_dir / "processed" / "evaluation" / f"{dataset}.jsonl"
+                    )
+                ),
+            ),
         )
-        for row in _limit(config, rows):
-            item = CanonicalItem.from_dict(row)
-            final_instruction = answer_instruction(item.answer_type, item.dataset)
-            input_ids = _tensor_input(
-                serialize_reasoning_prefill(
-                    tokenizer,
-                    GENERIC_PROMPT,
-                    item.prompt,
-                    final_instruction,
+        for dataset in config["data"].get("enabled_steering_datasets", [])
+    ]
+    total = sum(len(rows) * len(capabilities) * len(alphas) for _, rows in evaluation_sets)
+    resumed = min(len(completed), total)
+    failures = 0
+    progress = tqdm(total=total, initial=resumed, desc=output_path.stem)
+    try:
+        for dataset, rows in evaluation_sets:
+            for row in rows:
+                item = CanonicalItem.from_dict(row)
+                final_instruction = answer_instruction(item.answer_type, item.dataset)
+                input_ids = _tensor_input(
+                    serialize_reasoning_prefill(
+                        tokenizer,
+                        GENERIC_PROMPT,
+                        item.prompt,
+                        final_instruction,
+                    )
                 )
-            )
-            for capability in config["experiment"]["capabilities"]:
-                for raw_alpha in config["experiment"]["alphas"]:
-                    alpha = float(raw_alpha)
-                    key_record = generation_identity_record(
-                        run_id=run_id,
-                        dataset=dataset,
-                        item=item,
-                        source_row=row,
-                        steering_capability=capability,
-                        alpha=alpha,
-                    )
-                    key_record.update(
-                        {
-                            "capture_artifact_id": capture_id,
-                            "vector_sha256": vector_sha256,
-                            "vector_scaling": scaling,
-                            "model_revision": config["model"].get("revision"),
-                            "model_resolution": _resolved_model_identity(
-                                model, tokenizer
-                            ),
-                            "generation_parameters": {
-                                "max_new_tokens": int(
-                                    config["model"].get("max_new_tokens", 2048)
-                                ),
-                                "do_sample": bool(
-                                    config["model"].get("do_sample", False)
-                                ),
-                                "use_cache": bool(config["model"].get("use_cache", True)),
-                            },
-                        }
-                    )
-                    key = generation_key(key_record)
-                    if key in completed:
-                        continue
-                    cache_key = key[:2]
-                    try:
-                        if alpha == 0.0 and cache_key in baseline_cache:
-                            output = baseline_cache[cache_key]
-                        else:
-                            output = generate_with_optional_steering(
-                                model,
-                                tokenizer,
-                                input_ids,
-                                layer,
-                                vector=(
-                                    None
-                                    if alpha == 0.0
-                                    else vectors[capability][form]
-                                ),
-                                alpha=alpha,
-                                max_new_tokens=int(
-                                    config["model"].get("max_new_tokens", 2048)
-                                ),
-                            )
-                            if alpha == 0.0:
-                                baseline_cache[cache_key] = output
-                        predicted = extract_answer(output, item.answer_type)
-                        persisted = {
-                            **key_record,
-                            "raw_output": output,
-                            "predicted_answer": predicted,
-                            "correct": is_correct(
-                                predicted,
-                                item.gold_answer,
-                                dataset=dataset,
-                                answer_type=item.answer_type,
-                            ),
-                            "status": "ok",
-                        }
-                    except Exception as error:
-                        persisted = _operation_error_record(
-                            error,
-                            **key_record,
-                            stage="run_steering",
-                            target_layer=int(config["experiment"]["target_layer"]),
+                for capability in capabilities:
+                    for raw_alpha in alphas:
+                        alpha = float(raw_alpha)
+                        key_record = generation_identity_record(
+                            run_id=run_id,
+                            dataset=dataset,
+                            item=item,
+                            source_row=row,
+                            steering_capability=capability,
+                            alpha=alpha,
                         )
-                    append_jsonl(output_path, persisted)
-                    if persisted["status"] == "ok":
-                        completed.add(key)
+                        key_record.update(
+                            {
+                                "capture_artifact_id": capture_id,
+                                "vector_sha256": vector_sha256,
+                                "vector_scaling": scaling,
+                                "model_revision": config["model"].get("revision"),
+                                "model_resolution": _resolved_model_identity(
+                                    model, tokenizer
+                                ),
+                                "generation_parameters": {
+                                    "max_new_tokens": int(
+                                        config["model"].get("max_new_tokens", 2048)
+                                    ),
+                                    "do_sample": bool(
+                                        config["model"].get("do_sample", False)
+                                    ),
+                                    "use_cache": bool(
+                                        config["model"].get("use_cache", True)
+                                    ),
+                                },
+                            }
+                        )
+                        key = generation_key(key_record)
+                        if key in completed:
+                            continue
+                        cache_key = key[:2]
+                        try:
+                            if alpha == 0.0 and cache_key in baseline_cache:
+                                output = baseline_cache[cache_key]
+                            else:
+                                output = generate_with_optional_steering(
+                                    model,
+                                    tokenizer,
+                                    input_ids,
+                                    layer,
+                                    vector=(
+                                        None
+                                        if alpha == 0.0
+                                        else vectors[capability][form]
+                                    ),
+                                    alpha=alpha,
+                                    max_new_tokens=int(
+                                        config["model"].get("max_new_tokens", 2048)
+                                    ),
+                                )
+                                if alpha == 0.0:
+                                    baseline_cache[cache_key] = output
+                            predicted = extract_answer(output, item.answer_type)
+                            persisted = {
+                                **key_record,
+                                "raw_output": output,
+                                "predicted_answer": predicted,
+                                "correct": is_correct(
+                                    predicted,
+                                    item.gold_answer,
+                                    dataset=dataset,
+                                    answer_type=item.answer_type,
+                                ),
+                                "status": "ok",
+                            }
+                        except Exception as error:
+                            persisted = _operation_error_record(
+                                error,
+                                **key_record,
+                                stage="run_steering",
+                                target_layer=int(config["experiment"]["target_layer"]),
+                            )
+                        append_jsonl(output_path, persisted)
+                        if persisted["status"] == "ok":
+                            completed.add(key)
+                        else:
+                            failures += 1
+                        progress.update(1)
+                        progress.set_postfix(resumed=resumed, failed=failures)
+    finally:
+        progress.close()
     _write_manifest(
         config,
         outputs_dir,
