@@ -12,7 +12,7 @@ import torch
 from safetensors.torch import load_file
 from tqdm.auto import tqdm
 
-from self_steering.datasets.filtering import demand_memberships, demand_slice
+from self_steering.datasets.filtering import demand_slice
 from self_steering.datasets.registry import DatasetRegistry
 from self_steering.datasets.scoring import (
     annotations_to_wide,
@@ -277,7 +277,7 @@ def score_demands(
 ) -> dict[str, Path]:
     data_dir, outputs_dir = _directories(config)
     dimensions = list(config["experiment"]["capabilities"])
-    names = ["mmlu", *config["data"].get("enabled_steering_datasets", [])]
+    names = ["mmlu"]
     result: dict[str, Path] = {}
     max_workers = int(config["experiment"].get("annotation", {}).get("max_workers", 1))
     for name in dict.fromkeys(names):
@@ -347,16 +347,7 @@ def prepare_items(config: dict) -> dict[str, Path]:
         result[f"extraction_{capability}"] = path
 
     for dataset in config["data"].get("enabled_steering_datasets", []):
-        rows = list(
-            read_jsonl(data_dir / "scored" / f"{dataset}_with_4d_demands.jsonl")
-        )
-        selected: list[dict[str, Any]] = []
-        for row in rows:
-            memberships = demand_memberships(row, capabilities, high, low)
-            if memberships:
-                enriched = dict(row)
-                enriched["demand_memberships"] = memberships
-                selected.append(enriched)
+        selected = list(read_jsonl(data_dir / "processed" / f"{dataset}.jsonl"))
         path = data_dir / "processed" / "evaluation" / f"{dataset}.jsonl"
         write_jsonl(path, selected)
         result[f"evaluation_{dataset}"] = path
@@ -776,11 +767,17 @@ def score_generations(config: dict) -> dict[str, Path]:
         dataset_rows = [row for row in rows if row["dataset"] == dataset]
         dataset_report: dict[str, Any] = {
             "by_capability": {},
-            "demand_slices": {},
             "population": {},
-            "specificity": {},
-            "diagonal_dominance": {},
         }
+        has_demand_memberships = any(
+            isinstance(row.get("demand_memberships"), Mapping)
+            and bool(row["demand_memberships"])
+            for row in dataset_rows
+        )
+        if has_demand_memberships:
+            dataset_report["demand_slices"] = {}
+            dataset_report["specificity"] = {}
+            dataset_report["diagonal_dominance"] = {}
         paired_dataset_rows: list[Mapping[str, Any]] = []
         expected_alphas = [float(alpha) for alpha in config["experiment"]["alphas"]]
         for capability in sorted({row["steering_capability"] for row in dataset_rows}):
@@ -801,16 +798,17 @@ def score_generations(config: dict) -> dict[str, Path]:
             }
             effects = accuracy_by_alpha(capability_rows)
             dataset_report["by_capability"][capability] = effects
-            dataset_report["demand_slices"][capability] = {}
-            for demand in config["experiment"]["capabilities"]:
-                slices = {
-                    slice_name: accuracy_by_demand_slice(
-                        capability_rows, demand, slice_name
-                    )
-                    for slice_name in ("high", "low")
-                }
-                if any(slices.values()):
-                    dataset_report["demand_slices"][capability][demand] = slices
+            if has_demand_memberships:
+                dataset_report["demand_slices"][capability] = {}
+                for demand in config["experiment"]["capabilities"]:
+                    slices = {
+                        slice_name: accuracy_by_demand_slice(
+                            capability_rows, demand, slice_name
+                        )
+                        for slice_name in ("high", "low")
+                    }
+                    if any(slices.values()):
+                        dataset_report["demand_slices"][capability][demand] = slices
             for alpha, values in effects.items():
                 csv_rows.append(
                     {
@@ -820,22 +818,23 @@ def score_generations(config: dict) -> dict[str, Path]:
                         **values,
                     }
                 )
-        for raw_alpha in config["experiment"]["alphas"]:
-            alpha = float(raw_alpha)
-            if alpha == 0.0:
-                continue
-            specificity = specificity_report(
-                paired_dataset_rows,
-                alpha=alpha,
-                capabilities=config["experiment"]["capabilities"],
-            )
-            dataset_report["specificity"][str(alpha)] = {
-                key: specificity[key]
-                for key in ("matrix", "counts", "missing_cells")
-            }
-            dataset_report["diagonal_dominance"][str(alpha)] = specificity[
-                "diagonal_dominance"
-            ]
+        if has_demand_memberships:
+            for raw_alpha in config["experiment"]["alphas"]:
+                alpha = float(raw_alpha)
+                if alpha == 0.0:
+                    continue
+                specificity = specificity_report(
+                    paired_dataset_rows,
+                    alpha=alpha,
+                    capabilities=config["experiment"]["capabilities"],
+                )
+                dataset_report["specificity"][str(alpha)] = {
+                    key: specificity[key]
+                    for key in ("matrix", "counts", "missing_cells")
+                }
+                dataset_report["diagonal_dominance"][str(alpha)] = specificity[
+                    "diagonal_dominance"
+                ]
         report["datasets"][dataset] = dataset_report
     json_path = outputs_dir / "metrics" / f"{run_id}_steering_metrics.json"
     csv_path = outputs_dir / "metrics" / f"{run_id}_steering_metrics.csv"

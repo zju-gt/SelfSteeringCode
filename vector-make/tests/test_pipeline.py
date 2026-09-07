@@ -74,7 +74,7 @@ def test_prepare_data_writes_mmlu_and_enabled_steering_dataset(tmp_path: Path) -
     assert (tmp_path / "outputs" / "manifests" / "00_prepare_data").is_dir()
 
 
-def test_prepare_items_writes_extraction_and_external_memberships(
+def test_prepare_items_writes_extraction_and_full_unlabeled_external_dataset(
     tmp_path: Path,
 ) -> None:
     config = base_config(tmp_path)
@@ -96,26 +96,20 @@ def test_prepare_items_writes_extraction_and_external_memberships(
             }
         ],
     )
+    processed = tmp_path / "data" / "processed"
+    processed.mkdir(parents=True)
     write_jsonl(
-        scored / "math500_with_4d_demands.jsonl",
+        processed / "math500.jsonl",
         [
-            {
-                "item_id": "x1",
-                "dataset": "math500",
-                "split": "test",
-                "prompt": "q",
-                "gold_answer": "1",
-                "answer_type": "math",
-                "choices": None,
-                "metadata": {},
-                "demand_scores": {"QLl": 1, "QLq": 4},
-            }
+            CanonicalItem("x1", "math500", "test", "q1", "1", "math").to_dict(),
+            CanonicalItem("x2", "math500", "test", "q2", "2", "math").to_dict(),
         ],
     )
     paths = prepare_items(config)
     assert [row["item_id"] for row in read_jsonl(paths["extraction_QLl"])] == ["m1"]
     evaluation = list(read_jsonl(paths["evaluation_math500"]))
-    assert evaluation[0]["demand_memberships"] == {"QLl": "low", "QLq": "high"}
+    assert [row["item_id"] for row in evaluation] == ["x1", "x2"]
+    assert all("demand_memberships" not in row for row in evaluation)
 
 
 def test_capture_artifact_id_changes_with_layer(tmp_path: Path) -> None:
@@ -235,7 +229,8 @@ def test_score_demands_honors_runtime_limit(tmp_path: Path) -> None:
         }
 
     score_demands(config, label)
-    assert len(calls) == 4
+    assert len(calls) == 2
+    assert {item_id for item_id, _ in calls} == {"mmlu-0"}
 
 
 def test_score_demands_preserves_errors_and_explains_how_to_resume(tmp_path: Path) -> None:

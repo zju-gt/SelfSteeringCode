@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import json
+
 import torch
 from torch import nn
 
@@ -139,3 +141,7 @@ def test_offline_pipeline_from_registry_to_metrics(tmp_path: Path) -> None:
     assert all(row["generation_parameters"]["max_new_tokens"] == 1 for row in generation_rows)
     metrics = score_generations(config)
     assert all(path.exists() for path in metrics.values())
+    report = json.loads(metrics["json"].read_text(encoding="utf-8"))
+    dataset_report = report["datasets"]["math500"]
+    assert "demand_slices" not in dataset_report
+    assert "specificity" not in dataset_report
