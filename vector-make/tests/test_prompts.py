@@ -18,7 +18,7 @@ def test_exactly_four_capability_prompts_plus_generic() -> None:
     assert GENERIC_PROMPT not in CAPABILITY_PROMPTS.values()
 
 
-def test_reasoning_prefill_uses_continue_final_message() -> None:
+def test_math_prompt_uses_stir_style_chat_template() -> None:
     tokenizer = RecordingTokenizer()
     ids = serialize_reasoning_prefill(
         tokenizer,
@@ -27,19 +27,28 @@ def test_reasoning_prefill_uses_continue_final_message() -> None:
         "Return boxed math.",
     )
     assert ids == [10, 20, 30]
-    assert tokenizer.messages[-1] == {"role": "assistant", "content": "Reasoning:"}
-    assert tokenizer.kwargs["continue_final_message"] is True
-    assert tokenizer.kwargs["add_generation_prompt"] is False
+    assert tokenizer.messages == [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant. Follow the user's instructions carefully.",
+        },
+        {
+            "role": "user",
+            "content": "instruction\nReturn boxed math.\n\nProblem:\nquestion",
+        },
+    ]
+    assert tokenizer.kwargs["add_generation_prompt"] is True
+    assert "continue_final_message" not in tokenizer.kwargs
     assert tokenizer.kwargs["tokenize"] is True
 
 
 def test_generic_and_capability_change_only_reasoning_instruction() -> None:
     generic = build_chat_messages(GENERIC_PROMPT, "Q", "format")
     capability = build_chat_messages(CAPABILITY_PROMPTS["QLq"], "Q", "format")
-    assert generic[-1] == capability[-1]
+    assert generic[0] == capability[0]
     assert (
-        generic[0]["content"].split("\n\nQuestion:", 1)[1]
-        == capability[0]["content"].split("\n\nQuestion:", 1)[1]
+        generic[-1]["content"].split("\n\nProblem:", 1)[1]
+        == capability[-1]["content"].split("\n\nProblem:", 1)[1]
     )
 
 

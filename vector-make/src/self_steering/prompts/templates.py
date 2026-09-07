@@ -1,7 +1,7 @@
 """The one generic and four capability-specific reasoning instructions."""
 
-GENERIC_PROMPT = """Solve the problem carefully.
-Reason systematically and verify the final answer."""
+GENERIC_PROMPT = """Solve the following problem step by step.
+You should show intermediate steps."""
 
 CAPABILITY_PROMPTS = {
     "QLl": """Identify the relevant premises and rules.

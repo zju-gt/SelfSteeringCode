@@ -61,6 +61,8 @@ def test_prepare_data_cli_uses_default_configs_from_any_working_directory(
             "--override",
             f"data.sources.math500.local_path={math500.as_posix()}",
             "--override",
+            "data.enabled_steering_datasets=[math500]",
+            "--override",
             f"experiment.paths.data_dir={tmp_path.as_posix()}/data",
             "--override",
             f"experiment.paths.outputs_dir={tmp_path.as_posix()}/outputs",

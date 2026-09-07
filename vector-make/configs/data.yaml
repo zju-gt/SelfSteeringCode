@@ -3,6 +3,9 @@ data:
   prepared_dir: data/processed
   enabled_steering_datasets:
     - math500
+    - aime2024
+    - aime2025
+    - aime2026
   sources:
     mmlu:
       path: cais/mmlu
@@ -16,15 +19,15 @@ data:
     aime2024:
       path: OpenRLHF/aime-2024
       split: train
-      local_path: null
+      local_path: dataset/aime2024.jsonl
     aime2025:
       path: test-time-compute/aime_2025
       split: train
-      local_path: null
+      local_path: dataset/aime2025.jsonl
     aime2026:
       path: 96kevinli29/aime2026-en
       split: train
-      local_path: null
+      local_path: dataset/aime2026.jsonl
     arc_c:
       path: allenai/ai2_arc
       name: ARC-Challenge
