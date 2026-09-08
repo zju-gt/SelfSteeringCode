@@ -9,21 +9,19 @@ from typing import Any
 
 def accuracy_by_alpha(
     rows: Iterable[Mapping[str, Any]],
-) -> dict[float, dict[str, float | int]]:
+) -> dict[float, dict[str, float | int | None]]:
     grouped: dict[float, list[bool]] = defaultdict(list)
     for row in rows:
         grouped[float(row["alpha"])].append(bool(row["correct"]))
-    if 0.0 not in grouped:
-        raise ValueError("alpha-zero baseline is required")
     accuracies = {
         alpha: sum(values) / len(values) for alpha, values in grouped.items() if values
     }
-    baseline = accuracies[0.0]
+    baseline = accuracies.get(0.0)
     return {
         alpha: {
             "count": len(grouped[alpha]),
             "accuracy": accuracy,
-            "delta": accuracy - baseline,
+            "delta": accuracy - baseline if baseline is not None else None,
         }
         for alpha, accuracy in sorted(accuracies.items())
     }
@@ -33,7 +31,7 @@ def accuracy_by_demand_slice(
     rows: Iterable[Mapping[str, Any]],
     capability: str,
     slice_name: str,
-) -> dict[float, dict[str, float | int]]:
+) -> dict[float, dict[str, float | int | None]]:
     if slice_name not in {"high", "low"}:
         raise ValueError("slice_name must be 'high' or 'low'")
     selected = [
@@ -55,8 +53,8 @@ def paired_alpha_rows(
 
     materialized = list(rows)
     required = {float(alpha) for alpha in expected_alphas}
-    if not required or 0.0 not in required:
-        raise ValueError("expected_alphas must include the alpha-zero baseline")
+    if not required:
+        raise ValueError("expected_alphas must be non-empty")
     observed: dict[tuple[str, str], set[float]] = defaultdict(set)
     for row in materialized:
         identity = (

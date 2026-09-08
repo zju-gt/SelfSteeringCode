@@ -458,3 +458,40 @@ def test_run_steering_batches_matching_capability_alpha_work(
 
     assert batch_sizes == [2, 2, 2]
     assert len(list(read_jsonl(output))) == 8
+
+
+def test_run_steering_without_baseline_generates_only_requested_alpha(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = base_config(tmp_path)
+    config["experiment"]["alphas"] = [0.5]
+    evaluation = tmp_path / "data" / "processed" / "evaluation"
+    evaluation.mkdir(parents=True)
+    write_jsonl(
+        evaluation / "math500.jsonl",
+        [CanonicalItem("x", "math500", "test", "q", "1", "math").to_dict()],
+    )
+    vector_root = tmp_path / "outputs" / "vectors" / capture_artifact_id(config)
+    vectors = {
+        capability: {
+            "raw": torch.ones(2),
+            "unit": torch.ones(2),
+            "steering": torch.ones(2),
+        }
+        for capability in config["experiment"]["capabilities"]
+    }
+    save_vector_library(
+        vector_root / "capability_vectors.safetensors",
+        vector_root / "capability_vectors.json",
+        vectors,
+        metadata={},
+    )
+    monkeypatch.setattr(
+        "self_steering.pipeline.generate_batch_with_optional_steering",
+        lambda *args, **kwargs: [r"\boxed{1}" for _ in args[2]],
+    )
+
+    rows = list(read_jsonl(run_steering(config, FailingGenerationModel(), MinimalTokenizer())))
+
+    assert len(rows) == 2
+    assert {row["alpha"] for row in rows} == {0.5}

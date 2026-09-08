@@ -2,6 +2,7 @@ from pathlib import Path
 
 import json
 
+import pytest
 import torch
 from torch import nn
 
@@ -94,8 +95,18 @@ def smoke_config(tmp_path: Path) -> dict:
     }
 
 
-def test_offline_pipeline_from_registry_to_metrics(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("alphas", "expected_generation_rows", "expected_delta"),
+    [([0, 1], 4, 0.0), ([0.5], 2, None)],
+)
+def test_offline_pipeline_from_registry_to_metrics(
+    tmp_path: Path,
+    alphas: list[float],
+    expected_generation_rows: int,
+    expected_delta: float | None,
+) -> None:
     config = smoke_config(tmp_path)
+    config["experiment"]["alphas"] = alphas
     registry = DatasetRegistry()
     registry.register(
         "mmlu",
@@ -134,7 +145,7 @@ def test_offline_pipeline_from_registry_to_metrics(tmp_path: Path) -> None:
     assert all(path.exists() for path in analyze_similarity(config).values())
     generations = run_steering(config, model, tokenizer)
     generation_rows = list(read_jsonl(generations))
-    assert len(generation_rows) == 4
+    assert len(generation_rows) == expected_generation_rows
     assert all(row["run_id"] for row in generation_rows)
     assert all(row["capture_artifact_id"] for row in generation_rows)
     assert all(len(row["vector_sha256"]) == 64 for row in generation_rows)
@@ -145,3 +156,8 @@ def test_offline_pipeline_from_registry_to_metrics(tmp_path: Path) -> None:
     dataset_report = report["datasets"]["math500"]
     assert "demand_slices" not in dataset_report
     assert "specificity" not in dataset_report
+    first_alpha = float(alphas[0])
+    assert (
+        dataset_report["by_capability"]["QLl"][str(first_alpha)]["delta"]
+        == expected_delta
+    )

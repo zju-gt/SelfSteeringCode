@@ -555,6 +555,7 @@ def run_steering(config: dict, model: Any, tokenizer: Any) -> Path:
     }
     capabilities = list(config["experiment"]["capabilities"])
     alphas = list(config["experiment"]["alphas"])
+    has_baseline = any(float(alpha) == 0.0 for alpha in alphas)
     max_new_tokens = int(config["model"].get("max_new_tokens", 2048))
     batch_size = int(
         config["experiment"].get("generation", {}).get("batch_size", 1)
@@ -675,46 +676,47 @@ def run_steering(config: dict, model: Any, tokenizer: Any) -> Path:
         return [values[index : index + batch_size] for index in range(0, len(values), batch_size)]
 
     try:
-        baseline_tasks: list[
-            tuple[
-                tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor],
-                list[tuple[dict[str, Any], tuple[str, str, str, float]]],
-            ]
-        ] = []
-        for context in contexts:
-            pending = []
-            for capability in capabilities:
-                record, key = record_for(context, capability, 0.0)
-                if key not in completed:
-                    pending.append((record, key))
-            if not pending:
-                continue
-            cache_key = pending[0][1][:2]
-            if cache_key in baseline_cache:
-                for record, key in pending:
-                    persist(context, record, key, output=baseline_cache[cache_key])
-            else:
-                baseline_tasks.append((context, pending))
-        for batch in batches(baseline_tasks):
-            try:
-                outputs = generate_batch_with_optional_steering(
-                    model,
-                    tokenizer,
-                    [context[3] for context, _ in batch],
-                    layer,
-                    vector=None,
-                    alpha=0.0,
-                    max_new_tokens=max_new_tokens,
-                )
-            except Exception as error:
-                for context, pending in batch:
+        if has_baseline:
+            baseline_tasks: list[
+                tuple[
+                    tuple[str, Mapping[str, Any], CanonicalItem, torch.Tensor],
+                    list[tuple[dict[str, Any], tuple[str, str, str, float]]],
+                ]
+            ] = []
+            for context in contexts:
+                pending = []
+                for capability in capabilities:
+                    record, key = record_for(context, capability, 0.0)
+                    if key not in completed:
+                        pending.append((record, key))
+                if not pending:
+                    continue
+                cache_key = pending[0][1][:2]
+                if cache_key in baseline_cache:
                     for record, key in pending:
-                        persist(context, record, key, error=error)
-                continue
-            for (context, pending), output in zip(batch, outputs, strict=True):
-                baseline_cache[pending[0][1][:2]] = output
-                for record, key in pending:
-                    persist(context, record, key, output=output)
+                        persist(context, record, key, output=baseline_cache[cache_key])
+                else:
+                    baseline_tasks.append((context, pending))
+            for batch in batches(baseline_tasks):
+                try:
+                    outputs = generate_batch_with_optional_steering(
+                        model,
+                        tokenizer,
+                        [context[3] for context, _ in batch],
+                        layer,
+                        vector=None,
+                        alpha=0.0,
+                        max_new_tokens=max_new_tokens,
+                    )
+                except Exception as error:
+                    for context, pending in batch:
+                        for record, key in pending:
+                            persist(context, record, key, error=error)
+                    continue
+                for (context, pending), output in zip(batch, outputs, strict=True):
+                    baseline_cache[pending[0][1][:2]] = output
+                    for record, key in pending:
+                        persist(context, record, key, output=output)
 
         for capability in capabilities:
             for raw_alpha in alphas:
@@ -768,6 +770,8 @@ def score_generations(config: dict) -> dict[str, Path]:
         dataset_report: dict[str, Any] = {
             "by_capability": {},
             "population": {},
+            "baseline_available": 0.0
+            in {float(alpha) for alpha in config["experiment"]["alphas"]},
         }
         has_demand_memberships = any(
             isinstance(row.get("demand_memberships"), Mapping)
@@ -776,6 +780,7 @@ def score_generations(config: dict) -> dict[str, Path]:
         )
         if has_demand_memberships:
             dataset_report["demand_slices"] = {}
+        if has_demand_memberships and dataset_report["baseline_available"]:
             dataset_report["specificity"] = {}
             dataset_report["diagonal_dominance"] = {}
         paired_dataset_rows: list[Mapping[str, Any]] = []
@@ -818,7 +823,7 @@ def score_generations(config: dict) -> dict[str, Path]:
                         **values,
                     }
                 )
-        if has_demand_memberships:
+        if has_demand_memberships and dataset_report["baseline_available"]:
             for raw_alpha in config["experiment"]["alphas"]:
                 alpha = float(raw_alpha)
                 if alpha == 0.0:

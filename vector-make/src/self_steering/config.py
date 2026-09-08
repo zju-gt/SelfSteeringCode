@@ -167,8 +167,6 @@ def validate_config(config: dict[str, Any]) -> None:
         )
     ):
         raise ConfigError("experiment.alphas must be a non-empty list of numbers")
-    if not any(float(alpha) == 0.0 for alpha in alphas):
-        raise ConfigError("experiment.alphas must include zero for the baseline")
     normalized_alphas = [float(alpha) for alpha in alphas]
     if not all(math.isfinite(alpha) for alpha in normalized_alphas):
         raise ConfigError("experiment.alphas must contain only finite numbers")

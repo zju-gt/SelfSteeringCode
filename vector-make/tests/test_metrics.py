@@ -20,6 +20,12 @@ def test_accuracy_by_alpha_reports_change_from_zero() -> None:
     assert result[1.0] == {"count": 1, "accuracy": 1.0, "delta": 1.0}
 
 
+def test_accuracy_by_alpha_without_baseline_reports_no_delta() -> None:
+    result = accuracy_by_alpha([{"alpha": 0.5, "correct": True}])
+
+    assert result[0.5] == {"count": 1, "accuracy": 1.0, "delta": None}
+
+
 def test_specificity_matrix_indexes_steering_and_demand_capabilities() -> None:
     rows = [
         {

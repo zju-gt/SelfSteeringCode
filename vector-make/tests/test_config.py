@@ -86,6 +86,13 @@ def test_load_config_applies_dot_path_override(tmp_path: Path) -> None:
     assert config["data"]["enabled_steering_datasets"] == ["math500", "aime2026"]
 
 
+def test_validate_config_accepts_alpha_configuration_without_baseline() -> None:
+    config = valid_config()
+    config["experiment"]["alphas"] = [0.5]
+
+    validate_config(config)
+
+
 def test_load_config_rejects_out_of_range_layer(tmp_path: Path) -> None:
     path = tmp_path / "bad.yaml"
     path.write_text(
