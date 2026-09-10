@@ -3,9 +3,9 @@ data:
   prepared_dir: data/processed
   enabled_steering_datasets:
     - math500
-    - aime2024
-    - aime2025
-    - aime2026
+    # - aime2024
+    # - aime2025
+    # - aime2026
   sources:
     mmlu:
       path: cais/mmlu

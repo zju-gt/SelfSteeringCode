@@ -9,6 +9,7 @@ experiment:
   low_demand_threshold: 1
   vector_scaling: mean_norm
   alphas:
+    - 0
     - 0.5
   generation:
     batch_size: 4
